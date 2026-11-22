@@ -31,8 +31,9 @@ end
 local function publish(player, entry, message)
     player:SetAttribute("Coins", entry.coins)
     player:SetAttribute("SpeedTier", entry.tier)
-    player:SetAttribute("EquippedPet", entry.pet and entry.pet.pet or "")
+    player:SetAttribute("EquippedPet", entry.pet and (entry.pet.name .. " · " .. entry.pet.rarity) or "")
     player:SetAttribute("EggName", entry.egg and entry.egg.name or "")
+    player:SetAttribute("EggAbility", entry.egg and not entry.abilityUsed and entry.egg.ability or "")
     player:SetAttribute("Delivered", entry.delivered)
     if message then
         player:SetAttribute("Notice", message)
@@ -59,12 +60,12 @@ local function accessory(root, name, color, size, offset)
     return visual
 end
 
-local function showPet(root, egg)
+local function showPet(root, pet)
     local previous = root:FindFirstChild("EggstridePet")
     if previous then
         previous:Destroy()
     end
-    local accent = World.eggColor(egg)
+    local accent = World.variantColor(pet)
     local body = accessory(root, "EggstridePet", accent, Vector3.new(1.9, 1.45, 1.7), Vector3.new(2.6, 0, 2.4))
     for _, x in ipairs({ -0.43, 0.43 }) do
         accessory(body, "Eye", Color3.fromRGB(46, 40, 61), Vector3.new(0.21, 0.27, 0.21), Vector3.new(x, 0.1, -0.72))
@@ -75,6 +76,7 @@ end
 local function clearEgg(player, entry)
     entry.egg = nil
     entry.eggVault = nil
+    entry.abilityUsed = false
     if entry.eggVisual then
         entry.eggVisual:Destroy()
         entry.eggVisual = nil
@@ -139,9 +141,11 @@ local wasOpen = false
 local currentRound = -1
 local random = Random.new()
 local roundEggs = {}
+local vineEndsAt = nil
 
 local function syncRound()
-    local elapsed = workspace:GetServerTimeNow() - startedAt
+    local now = workspace:GetServerTimeNow()
+    local elapsed = now - startedAt
     local cycle = math.floor(elapsed / (Rules.PrepareSeconds + Rules.RunSeconds))
     local open = Rules.clock(elapsed)
     if currentRound ~= cycle then
@@ -162,6 +166,10 @@ local function syncRound()
         wasOpen = open
         map.gate.CanCollide = not open
         map.gate.Transparency = if open then 1 else 0.35
+    end
+    if vineEndsAt and (not open or now >= vineEndsAt) then
+        vineEndsAt = nil
+        World.showVine(map.vine, false)
     end
     if not open then
         for player in pairs(entries) do
@@ -188,12 +196,28 @@ for index, display in ipairs(map.vaults) do
         local egg = roundEggs[index]
         entry.egg = egg
         entry.eggVault = vault
-        entry.eggVisual = accessory(root, "EggstrideEgg", World.eggColor(egg),
+        entry.eggVisual = accessory(root, "EggstrideEgg", World.variantColor(egg),
             Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
         applySpeed(player, entry)
-        publish(player, entry, "Возвращайся в лагерь и подойди к инкубатору.")
+        publish(player, entry, if egg.ability == "Лиана"
+            then "Лиана может открыть путь домой. Ищи росток у края острова."
+            else "Возвращайся в лагерь и подойди к инкубатору.")
     end)
 end
+
+withNearbyPlayer(map.vinePrompt, function(player, entry)
+    if not syncRound() or not entry.egg or entry.egg.ability ~= "Лиана" or entry.abilityUsed then
+        return
+    end
+    if vineEndsAt then
+        publish(player, entry, "Мост уже открыт. Можно бежать!")
+        return
+    end
+    entry.abilityUsed = true
+    vineEndsAt = workspace:GetServerTimeNow() + Rules.VineDuration
+    World.showVine(map.vine, true)
+    publish(player, entry, "Мост из лиан открыт на " .. Rules.VineDuration .. " сек.")
+end)
 
 withNearbyPlayer(map.hatch, function(player, entry, root)
     if not syncRound() or not entry.egg then
@@ -204,9 +228,10 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
     clearEgg(player, entry)
     entry.delivered = true
     entry.coins += vault.coins
-    entry.pet = egg
-    showPet(root, egg)
-    publish(player, entry, "Вылупился " .. egg.pet .. " · +" .. vault.coins .. " монет.")
+    local pet = Rules.hatchForRoll(vault, egg, random:NextInteger(1, 100))
+    entry.pet = pet
+    showPet(root, pet)
+    publish(player, entry, "Вылупился " .. pet.name .. " (" .. pet.rarity .. ")" .. " · +" .. vault.coins .. " монет.")
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)

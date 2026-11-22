@@ -5,26 +5,40 @@ Rules.RunSeconds = 25
 Rules.CarryMultiplier = 0.75
 Rules.StartCoins = 15
 Rules.GateX = 28
+Rules.VineDuration = 6
+Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
 Rules.Vaults = {
     {
         name = "Луговой", x = 63, tier = 1, coins = 32,
+        pets = {
+            common = { name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
+            rare = { name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
+        },
         eggs = {
-            { id = "leaf_tail", name = "Листовое яйцо", pet = "Листохвост", rarity = "Обычное", weight = 80, color = { 176, 220, 111 } },
-            { id = "dew_moth", name = "Яйцо росы", pet = "Росокрыл", rarity = "Редкое", weight = 20, color = { 113, 232, 235 } },
+            { id = "leaf_shell", name = "Листовое яйцо", rarity = "Обычное", weight = 80, ability = "Лиана", color = { 176, 220, 111 } },
+            { id = "dew_shell", name = "Яйцо росы", rarity = "Редкое", weight = 20, ability = "Лиана", color = { 113, 232, 235 } },
         },
     },
     {
         name = "Янтарный", x = 143, tier = 2, coins = 54,
+        pets = {
+            common = { name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
+            rare = { name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
+        },
         eggs = {
-            { id = "amber_crab", name = "Янтарное яйцо", pet = "Янтарный краб", rarity = "Обычное", weight = 85, color = { 255, 178, 76 } },
-            { id = "prism_fox", name = "Призматическое яйцо", pet = "Призмолис", rarity = "Редкое", weight = 15, color = { 255, 113, 165 } },
+            { id = "amber_shell", name = "Янтарное яйцо", rarity = "Обычное", weight = 85, color = { 255, 178, 76 } },
+            { id = "prism_shell", name = "Призматическое яйцо", rarity = "Редкое", weight = 15, color = { 255, 113, 165 } },
         },
     },
     {
         name = "Грозовой", x = 252, tier = 4, coins = 95,
+        pets = {
+            common = { name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
+            rare = { name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
+        },
         eggs = {
-            { id = "thunder_puff", name = "Грозовое яйцо", pet = "Громопух", rarity = "Обычное", weight = 90, color = { 182, 150, 255 } },
-            { id = "lightning_kite", name = "Яйцо молнии", pet = "Молниехвост", rarity = "Редкое", weight = 10, color = { 255, 237, 108 } },
+            { id = "thunder_shell", name = "Грозовое яйцо", rarity = "Обычное", weight = 90, color = { 182, 150, 255 } },
+            { id = "lightning_shell", name = "Яйцо молнии", rarity = "Редкое", weight = 10, color = { 255, 237, 108 } },
         },
     },
 }
@@ -55,6 +69,10 @@ function Rules.eggForRoll(vault, roll)
         end
     end
     error("Egg roll exceeds the biome pool")
+end
+
+function Rules.hatchForRoll(vault, egg, roll)
+    return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
 end
 
 return Rules

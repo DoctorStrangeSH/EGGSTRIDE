@@ -79,22 +79,31 @@ local function vegetation(parent, name, x, z, size, angle)
     mesh.Parent = parent
 end
 
-local function runway(parent, fromX, toX)
+local function runway(parent, fromX, toX, lane)
     local center = (fromX + toX) / 2
-    part(parent, "Мост", Vector3.new(toX - fromX, 1, 13), Vector3.new(center, -0.5, 0), Colors.wood, true)
+    part(parent, "Мост", Vector3.new(toX - fromX, 1, 13), Vector3.new(center, -0.5, lane), Colors.wood, true)
     for _, z in ipairs({ -6, 6 }) do
-        part(parent, "Бортик", Vector3.new(toX - fromX, 0.6, 0.5), Vector3.new(center, 0.3, z), Colors.cream, false)
+        part(parent, "Бортик", Vector3.new(toX - fromX, 0.6, 0.5), Vector3.new(center, 0.3, lane + z), Colors.cream, false)
     end
 end
 
-function World.eggColor(egg)
+function World.variantColor(egg)
     return Color3.fromRGB(table.unpack(egg.color))
 end
 
 function World.showEgg(display, egg)
-    display.part.Color = World.eggColor(egg)
-    display.label.Text = egg.name .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
+    display.part.Color = World.variantColor(egg)
+    local ability = if egg.ability then egg.ability .. " · мост на " .. display.vineDuration .. " сек." else "Без способности"
+    display.label.Text = egg.name
+        .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
+        .. "\n" .. ability
+        .. "\nРедкий питомец " .. display.rareChance[egg.rarity] .. "%"
     display.prompt.ObjectText = egg.name
+end
+
+function World.showVine(vine, active)
+    vine.CanCollide = active
+    vine.Transparency = if active then 0 else 1
 end
 
 function World.build(rules)
@@ -135,8 +144,14 @@ function World.build(rules)
     sign(hatch, "ИНКУБАТОР", "Сдай яйцо")
     sign(shop, "ТРЕНИРОВКА", "Увеличь скорость")
 
-    runway(scene, 24, 50)
-    local gate = part(scene, "Ворота", Vector3.new(1, 10, 13), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
+    runway(scene, 24, 50, -9)
+    local vine = part(scene, "Мост из лиан", Vector3.new(26, 0.8, 8), Vector3.new(37, -0.4, 8), Colors.grass, false)
+    World.showVine(vine, false)
+    local sprout = part(scene, "Росток", Vector3.new(2, 1.5, 2), Vector3.new(52, 0.75, 8), Colors.grass, false)
+    sign(sprout, "ЛИАНА", "Выращивает мост в лагерь")
+    local vinePrompt = prompt(sprout, "Вырастить мост", "Лиана")
+    vinePrompt.MaxActivationDistance = 8
+    local gate = part(scene, "Ворота", Vector3.new(1, 10, 32), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
     gate.Material = Enum.Material.Neon
     gate.Transparency = 0.35
 
@@ -145,7 +160,7 @@ function World.build(rules)
     for index, vault in ipairs(rules.Vaults) do
         local accent = World.VaultColors[index]
         if previousX then
-            runway(scene, previousX + 13, vault.x - 13)
+            runway(scene, previousX + 13, vault.x - 13, 0)
         end
         island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))
         local treeName = if index == 1 then "RoundTree" else "Pine"
@@ -156,11 +171,16 @@ function World.build(rules)
         part(scene, "Пьедестал", Vector3.new(5, 1, 5), Vector3.new(vault.x, 0.5, 0), Colors.plum, false)
         local egg = part(scene, "Яйцо", Vector3.new(2.4, 3.2, 2.4), Vector3.new(vault.x, 2.6, 0), accent, false)
         egg.Shape = Enum.PartType.Ball
+        local eggLabel = sign(egg, vault.name, "Скорость " .. vault.tier)
+        eggLabel.Parent.Size = UDim2.fromScale(14, 6)
+        eggLabel.Parent.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
         vaultDisplays[index] = {
             part = egg,
-            label = sign(egg, vault.name, "Скорость " .. vault.tier),
+            label = eggLabel,
             prompt = prompt(egg, "Забрать яйцо", vault.name),
             tier = vault.tier,
+            rareChance = rules.RarePetChance,
+            vineDuration = rules.VineDuration,
         }
         previousX = vault.x
     end
@@ -176,6 +196,8 @@ function World.build(rules)
     return {
         spawn = spawn,
         gate = gate,
+        vine = vine,
+        vinePrompt = vinePrompt,
         hatch = prompt(hatch, "Вылупить", "Инкубатор"),
         shop = prompt(shop, "Тренироваться", "Скорость"),
         vaults = vaultDisplays,

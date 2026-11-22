@@ -51,6 +51,7 @@ local notice = label("Notice", 94, 32, 12, colors.white)
 
 local function update()
     local egg = player:GetAttribute("EggName")
+    local ability = player:GetAttribute("EggAbility")
     local best = player:GetAttribute("EquippedPet")
     local tier = player:GetAttribute("SpeedTier") or 1
     local cost = Rules.UpgradeCosts[tier]
@@ -58,14 +59,15 @@ local function update()
     pet.Text = if egg and egg ~= "" then "Несёшь яйцо: " .. egg
         elseif best and best ~= "" then "Питомец: " .. best
         else "Питомец появится после вылупления"
-    objective.Text = if egg and egg ~= "" then "Цель: успей к инкубатору"
+    objective.Text = if ability and ability ~= "" then ability .. " · используй у ростка"
+        elseif egg and egg ~= "" then "Цель: успей к инкубатору"
         elseif player:GetAttribute("Delivered") then "Яйцо спасено · жди следующего забега"
         elseif cost then "Следующая тренировка: " .. cost .. " монет"
         else "Выбирай остров и возвращайся до закрытия"
     notice.Text = player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "Coins", "SpeedTier", "EggName", "EquippedPet", "Delivered", "Notice" }) do
+for _, name in ipairs({ "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 update()

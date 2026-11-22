@@ -37,6 +37,15 @@ for _, vault in ipairs(Rules.Vaults) do
         assert(counts[egg] == egg.weight, "Uneven pool: " .. egg.id)
         assert(not species[egg.id], "Species appears in multiple biome pools: " .. egg.id)
         species[egg.id] = true
+        local rare = 0
+        for roll = 1, 100 do
+            local result = Rules.hatchForRoll(vault, egg, roll)
+            assert(result == vault.pets.rare or result == vault.pets.common, "Wrong biome")
+            if result == vault.pets.rare then
+                rare += 1
+            end
+        end
+        assert(rare == Rules.RarePetChance[egg.rarity], "Wrong hatch odds: " .. egg.id)
     end
 end
 print("Eggstride rules: OK")
