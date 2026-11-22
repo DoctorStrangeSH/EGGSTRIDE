@@ -50,6 +50,7 @@ local function sign(anchor, title, subtitle)
     label.Parent = plate
     Instance.new("UICorner", label).CornerRadius = UDim.new(0.2, 0)
     Instance.new("UIPadding", label).PaddingBottom = UDim.new(0.1, 0)
+    return label
 end
 
 local function prompt(anchor, action, object)
@@ -84,6 +85,16 @@ local function runway(parent, fromX, toX)
     for _, z in ipairs({ -6, 6 }) do
         part(parent, "Бортик", Vector3.new(toX - fromX, 0.6, 0.5), Vector3.new(center, 0.3, z), Colors.cream, false)
     end
+end
+
+function World.eggColor(egg)
+    return Color3.fromRGB(table.unpack(egg.color))
+end
+
+function World.showEgg(display, egg)
+    display.part.Color = World.eggColor(egg)
+    display.label.Text = egg.name .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
+    display.prompt.ObjectText = egg.name
 end
 
 function World.build(rules)
@@ -129,7 +140,7 @@ function World.build(rules)
     gate.Material = Enum.Material.Neon
     gate.Transparency = 0.35
 
-    local vaultPrompts = {}
+    local vaultDisplays = {}
     local previousX
     for index, vault in ipairs(rules.Vaults) do
         local accent = World.VaultColors[index]
@@ -145,8 +156,12 @@ function World.build(rules)
         part(scene, "Пьедестал", Vector3.new(5, 1, 5), Vector3.new(vault.x, 0.5, 0), Colors.plum, false)
         local egg = part(scene, "Яйцо", Vector3.new(2.4, 3.2, 2.4), Vector3.new(vault.x, 2.6, 0), accent, false)
         egg.Shape = Enum.PartType.Ball
-        sign(egg, vault.name, "Скорость " .. vault.tier)
-        vaultPrompts[index] = prompt(egg, "Забрать яйцо", vault.name)
+        vaultDisplays[index] = {
+            part = egg,
+            label = sign(egg, vault.name, "Скорость " .. vault.tier),
+            prompt = prompt(egg, "Забрать яйцо", vault.name),
+            tier = vault.tier,
+        }
         previousX = vault.x
     end
 
@@ -163,7 +178,7 @@ function World.build(rules)
         gate = gate,
         hatch = prompt(hatch, "Вылупить", "Инкубатор"),
         shop = prompt(shop, "Тренироваться", "Скорость"),
-        vaults = vaultPrompts,
+        vaults = vaultDisplays,
     }
 end
 

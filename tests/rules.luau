@@ -26,4 +26,17 @@ for _, vault in ipairs(Rules.Vaults) do
     local home = (vault.x - 14) / Rules.speed(vault.tier, true)
     assert(outward + home < Rules.RunSeconds, "Impossible minimum-tier route: " .. vault.name)
 end
+local species = {}
+for _, vault in ipairs(Rules.Vaults) do
+    local counts = {}
+    for roll = 1, 100 do
+        local egg = Rules.eggForRoll(vault, roll)
+        counts[egg] = (counts[egg] or 0) + 1
+    end
+    for _, egg in ipairs(vault.eggs) do
+        assert(counts[egg] == egg.weight, "Uneven pool: " .. egg.id)
+        assert(not species[egg.id], "Species appears in multiple biome pools: " .. egg.id)
+        species[egg.id] = true
+    end
+end
 print("Eggstride rules: OK")

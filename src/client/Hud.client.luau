@@ -51,7 +51,7 @@ local notice = label("Notice", 94, 32, 12, colors.white)
 
 local function update()
     local egg = player:GetAttribute("EggName")
-    local best = player:GetAttribute("BestPet")
+    local best = player:GetAttribute("EquippedPet")
     local tier = player:GetAttribute("SpeedTier") or 1
     local cost = Rules.UpgradeCosts[tier]
     stats.Text = string.format("Монеты %d  ·  Скорость %d/5", player:GetAttribute("Coins") or 0, tier)
@@ -65,7 +65,7 @@ local function update()
     notice.Text = player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "Coins", "SpeedTier", "EggName", "BestPet", "Delivered", "Notice" }) do
+for _, name in ipairs({ "Coins", "SpeedTier", "EggName", "EquippedPet", "Delivered", "Notice" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 update()

@@ -31,8 +31,8 @@ end
 local function publish(player, entry, message)
     player:SetAttribute("Coins", entry.coins)
     player:SetAttribute("SpeedTier", entry.tier)
-    player:SetAttribute("BestPet", entry.best and Rules.Vaults[entry.best].pet or "")
-    player:SetAttribute("EggName", entry.egg and Rules.Vaults[entry.egg].name or "")
+    player:SetAttribute("EquippedPet", entry.pet and entry.pet.pet or "")
+    player:SetAttribute("EggName", entry.egg and entry.egg.name or "")
     player:SetAttribute("Delivered", entry.delivered)
     if message then
         player:SetAttribute("Notice", message)
@@ -59,12 +59,12 @@ local function accessory(root, name, color, size, offset)
     return visual
 end
 
-local function showPet(root, index)
+local function showPet(root, egg)
     local previous = root:FindFirstChild("EggstridePet")
     if previous then
         previous:Destroy()
     end
-    local accent = World.VaultColors[index]
+    local accent = World.eggColor(egg)
     local body = accessory(root, "EggstridePet", accent, Vector3.new(1.9, 1.45, 1.7), Vector3.new(2.6, 0, 2.4))
     for _, x in ipairs({ -0.43, 0.43 }) do
         accessory(body, "Eye", Color3.fromRGB(46, 40, 61), Vector3.new(0.21, 0.27, 0.21), Vector3.new(x, 0.1, -0.72))
@@ -74,6 +74,7 @@ end
 
 local function clearEgg(player, entry)
     entry.egg = nil
+    entry.eggVault = nil
     if entry.eggVisual then
         entry.eggVisual:Destroy()
         entry.eggVisual = nil
@@ -101,8 +102,8 @@ local function join(player)
         end
         clearEgg(player, entry)
         publish(player, entry)
-        if entry.best then
-            showPet(root, entry.best)
+        if entry.pet then
+            showPet(root, entry.pet)
         end
         humanoid.Died:Connect(function()
             if player.Character ~= character or entries[player] ~= entry then
@@ -135,7 +136,9 @@ local function withNearbyPlayer(prompt, action)
 end
 
 local wasOpen = false
-local currentRound = 0
+local currentRound = -1
+local random = Random.new()
+local roundEggs = {}
 
 local function syncRound()
     local elapsed = workspace:GetServerTimeNow() - startedAt
@@ -143,6 +146,11 @@ local function syncRound()
     local open = Rules.clock(elapsed)
     if currentRound ~= cycle then
         currentRound = cycle
+        for index, vault in ipairs(Rules.Vaults) do
+            local egg = Rules.eggForRoll(vault, random:NextInteger(1, 100))
+            roundEggs[index] = egg
+            World.showEgg(map.vaults[index], egg)
+        end
         for player, entry in pairs(entries) do
             entry.delivered = false
             local lost = entry.egg ~= nil
@@ -167,9 +175,9 @@ local function syncRound()
     return open
 end
 
-for index, prompt in ipairs(map.vaults) do
+for index, display in ipairs(map.vaults) do
     local vault = Rules.Vaults[index]
-    withNearbyPlayer(prompt, function(player, entry, root)
+    withNearbyPlayer(display.prompt, function(player, entry, root)
         local open = syncRound()
         if not Rules.canCollect(entry.tier, vault, entry.egg ~= nil, open, entry.delivered) then
             if open and entry.tier < vault.tier then
@@ -177,8 +185,10 @@ for index, prompt in ipairs(map.vaults) do
             end
             return
         end
-        entry.egg = index
-        entry.eggVisual = accessory(root, "EggstrideEgg", World.VaultColors[index],
+        local egg = roundEggs[index]
+        entry.egg = egg
+        entry.eggVault = vault
+        entry.eggVisual = accessory(root, "EggstrideEgg", World.eggColor(egg),
             Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
         applySpeed(player, entry)
         publish(player, entry, "Возвращайся в лагерь и подойди к инкубатору.")
@@ -189,16 +199,14 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
     if not syncRound() or not entry.egg then
         return
     end
-    local index = entry.egg
-    local vault = Rules.Vaults[index]
+    local egg = entry.egg
+    local vault = entry.eggVault
     clearEgg(player, entry)
     entry.delivered = true
     entry.coins += vault.coins
-    if not entry.best or index > entry.best then
-        entry.best = index
-        showPet(root, index)
-    end
-    publish(player, entry, "Вылупился " .. vault.pet .. " · +" .. vault.coins .. " монет.")
+    entry.pet = egg
+    showPet(root, egg)
+    publish(player, entry, "Вылупился " .. egg.pet .. " · +" .. vault.coins .. " монет.")
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)
@@ -214,6 +222,8 @@ withNearbyPlayer(map.shop, function(player, entry)
         publish(player, entry, "Скорость повышена до уровня " .. entry.tier .. ".")
     end
 end)
+
+syncRound()
 
 Players.PlayerAdded:Connect(join)
 Players.PlayerRemoving:Connect(function(player)
