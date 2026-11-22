@@ -25,11 +25,25 @@ local function addLabel(parent, textSize, y, height)
     return label
 end
 
-function RunFeedback.connect(gui, event, rules)
+function RunFeedback.connect(gui, event, rules, player)
     local tickSound = sound("Countdown", "volume_slider.ogg", 1.15, 0.30)
     local startSound = sound("GateOpen", "volume_slider.ogg", 1.65, 0.40)
     local hatchSound = sound("Hatch", "action_get_up.mp3", 1.10, 0.50)
     local lossSound = sound("EggLost", "action_jump_land.mp3", 0.75, 0.45)
+
+    local function play(cue)
+        if player:GetAttribute("MuteRunSounds") ~= true then
+            cue:Play()
+        end
+    end
+
+    player:GetAttributeChangedSignal("MuteRunSounds"):Connect(function()
+        if player:GetAttribute("MuteRunSounds") then
+            for _, cue in ipairs({ tickSound, startSound, hatchSound, lossSound }) do
+                cue:Stop()
+            end
+        end
+    end)
 
     local card = Instance.new("Frame")
     card.Name = "RunResult"
@@ -51,20 +65,34 @@ function RunFeedback.connect(gui, event, rules)
 
     local lastResult = 0
     local animation
+    local function stopAnimation()
+        if animation then
+            animation:Cancel()
+            animation = nil
+        end
+        scale.Scale = 1
+    end
+
+    player:GetAttributeChangedSignal("ReduceCardMotion"):Connect(function()
+        if player:GetAttribute("ReduceCardMotion") then
+            stopAnimation()
+        end
+    end)
+
     local function show(heading, description, accent)
         lastResult += 1
         local thisResult = lastResult
-        if animation then
-            animation:Cancel()
-        end
+        stopAnimation()
         title.Text = heading
         title.TextColor3 = accent
         detail.Text = description
         outline.Color = accent
-        scale.Scale = 0.94
         card.Visible = true
-        animation = TweenService:Create(scale, TweenInfo.new(0.16, Enum.EasingStyle.Quad), { Scale = 1 })
-        animation:Play()
+        if player:GetAttribute("ReduceCardMotion") ~= true then
+            scale.Scale = 0.94
+            animation = TweenService:Create(scale, TweenInfo.new(0.16, Enum.EasingStyle.Quad), { Scale = 1 })
+            animation:Play()
+        end
         task.delay(2.8, function()
             if lastResult == thisResult then
                 card.Visible = false
@@ -80,11 +108,11 @@ function RunFeedback.connect(gui, event, rules)
                 else ""
             show(if isNew then petName .. " · новый вид" else petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
             hatchSound.PlaybackSpeed = if rarity == "Редкий" then 1.28 else 1.10
-            hatchSound:Play()
+            play(hatchSound)
         elseif kind == "Timeout" or kind == "Fall" then
             local description = if kind == "Timeout" then "Ворота закрылись. Попробуй ещё раз." else "Ты потерял яйцо при падении. Попробуй снова из лагеря."
             show("Яйцо потеряно", description, Color3.fromRGB(255, 147, 137))
-            lossSound:Play()
+            play(lossSound)
         end
     end)
 
@@ -92,9 +120,9 @@ function RunFeedback.connect(gui, event, rules)
     local previousSecond
     return function(open, seconds, carrying, muted)
         if not muted and open and previousOpen == false then
-            startSound:Play()
+            play(startSound)
         elseif not muted and open and carrying and seconds <= 3 and seconds ~= previousSecond then
-            tickSound:Play()
+            play(tickSound)
         end
         previousOpen = open
         previousSecond = seconds

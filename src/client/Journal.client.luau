@@ -4,6 +4,7 @@ local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
 local equipPet = shared:WaitForChild("EquipPet")
+local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
     panel = Color3.fromRGB(37, 34, 65),
@@ -86,6 +87,47 @@ list.Parent = panel
 local layout = Instance.new("UIListLayout", list)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, 6)
+
+local settings = textItem("TextButton", list, "Настройки забега", 14, palette.panel)
+settings.LayoutOrder = -3
+settings.Size = UDim2.new(1, -8, 0, 44)
+fill(settings, palette.gold, 10)
+
+local settingButtons = {}
+for index, option in ipairs({
+    { attribute = "MuteRunSounds", off = "Звуки забега · выкл.", on = "Звуки забега · вкл." },
+    { attribute = "ReduceCardMotion", off = "Карточки · без анимации", on = "Карточки · с анимацией" },
+}) do
+    local control = textItem("TextButton", list, "", 14, palette.text)
+    control.LayoutOrder = index - 3
+    control.Size = UDim2.new(1, -8, 0, 44)
+    control.Visible = false
+    fill(control, palette.row, 10)
+    table.insert(settingButtons, control)
+
+    local function updateSetting()
+        local value = player:GetAttribute(option.attribute)
+        control.Text = if value == nil then "Загрузка настроек…" elseif value then option.off else option.on
+        control.Active = value ~= nil
+        control.Selectable = value ~= nil
+    end
+    player:GetAttributeChangedSignal(option.attribute):Connect(updateSetting)
+    control.Activated:Connect(function()
+        local value = player:GetAttribute(option.attribute)
+        if value ~= nil then
+            updatePreference:FireServer(option.attribute, not value)
+        end
+    end)
+    updateSetting()
+end
+
+settings.Activated:Connect(function()
+    local expanded = not settingButtons[1].Visible
+    settings.Text = if expanded then "Скрыть настройки" else "Настройки забега"
+    for _, control in ipairs(settingButtons) do
+        control.Visible = expanded
+    end
+end)
 
 local trial = textItem("TextLabel", list, "", 13, palette.gold)
 trial.Name = "StormTrial"

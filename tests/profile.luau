@@ -11,6 +11,8 @@ end
 local defaults = Profile.new(Rules.StartCoins)
 assert(defaults.tier == 1 and defaults.coins == Rules.StartCoins and not next(defaults.owned) and defaults.onboarding == 0 and not defaults.stormTrailUnlocked)
 
+assert(defaults.muteRunSounds == false and defaults.reduceCardMotion == false)
+
 local opened = Profile.acquire(nil, "server_a", 100, catalog, Rules)
 assert(opened.lease.owner == "server_a" and opened.lease.expiresAt == 280)
 local blocked, reason = Profile.acquire(opened, "server_b", 101, catalog, Rules)
@@ -19,7 +21,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 
 local pet = catalog.dew_moth
 local entry = {
-    coins = 77, tier = 2, ownedPets = { [pet.id] = pet }, pet = pet,
+    coins = 77, tier = 2, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
     onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200 }, delivered = true, egg = Rules.Vaults[1].eggs[1],
 }
 local snapshot = Profile.snapshot(entry)
@@ -40,6 +42,7 @@ local rejoined = Profile.acquire(released, "server_c", 331, catalog, Rules)
 assert(rejoined.equipped == pet.id and rejoined.coins == 77 and rejoined.tier == 2 and rejoined.onboarding == 3 and rejoined.stormTrailUnlocked)
 
 assert(rejoined.deliveryRecords.meadow == 8420)
+assert(rejoined.muteRunSounds == true and rejoined.reduceCardMotion == true)
 assert(rejoined.weeklyRecord.week == 20 and rejoined.weeklyRecord.time == 14320
     and rejoined.weeklyRecord.rankedTime == 15200)
 snapshot.weeklyRecord = { week = 20, time = 14320, rankedTime = 500 }
@@ -57,6 +60,12 @@ assert(Profile.read(snapshot, catalog, Rules).onboarding == 4)
 local legacyNew = { version = Profile.VERSION, coins = 15, tier = 1, owned = {} }
 assert(Profile.read(legacyNew, catalog, Rules).onboarding == 0)
 assert(not Profile.read(legacyNew, catalog, Rules).stormTrailUnlocked)
+local legacyProfile = Profile.read(legacyNew, catalog, Rules)
+assert(legacyProfile.muteRunSounds == false and legacyProfile.reduceCardMotion == false)
+snapshot.muteRunSounds = "true"
+snapshot.reduceCardMotion = 1
+local sanitized = Profile.read(snapshot, catalog, Rules)
+assert(sanitized.muteRunSounds == false and sanitized.reduceCardMotion == false)
 snapshot.equipped = "unknown_pet"
 snapshot.owned.unknown_pet = true
 local normalized = Profile.read(snapshot, catalog, Rules)

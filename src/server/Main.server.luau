@@ -48,6 +48,14 @@ local runFeedback = Instance.new("RemoteEvent")
 runFeedback.Name = "RunFeedback"
 runFeedback.Parent = Shared
 
+local updatePreference = Instance.new("RemoteEvent")
+updatePreference.Name = "UpdatePreference"
+updatePreference.Parent = Shared
+local preferences = {
+    MuteRunSounds = "muteRunSounds",
+    ReduceCardMotion = "reduceCardMotion",
+}
+
 local entries = {}
 local loading = {}
 local closing = false
@@ -242,6 +250,8 @@ local function join(player)
     local entry = {
         session = session,
         coins = record.coins,
+        muteRunSounds = record.muteRunSounds,
+        reduceCardMotion = record.reduceCardMotion,
         onboarding = record.onboarding,
         stormTrailUnlocked = record.stormTrailUnlocked,
         deliveryRecords = record.deliveryRecords,
@@ -263,6 +273,9 @@ local function join(player)
     player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
     if entry.weeklyRecord and entry.weeklyRecord.week == week and entry.weeklyRecord.rankedTime then
         task.defer(weeklyLeaderboard.submit, weeklyLeaderboard, player.UserId, player.Name, week, entry.weeklyRecord.rankedTime)
+    end
+    for attribute, field in pairs(preferences) do
+        player:SetAttribute(attribute, entry[field])
     end
     entries[player] = entry
     pending -= 1
@@ -686,6 +699,19 @@ withNearbyPlayer(map.shop, function(player, entry)
         entry.tier += 1
         applySpeed(player, entry)
         publish(player, entry, "Скорость повышена до уровня " .. entry.tier .. ".")
+    end
+end)
+
+updatePreference.OnServerEvent:Connect(function(player, attribute, value)
+    local entry = entries[player]
+    if closing or not entry or ProfileStore.expired(entry.session)
+        or typeof(attribute) ~= "string" or typeof(value) ~= "boolean" then
+        return
+    end
+    local field = preferences[attribute]
+    if field and entry[field] ~= value then
+        entry[field] = value
+        player:SetAttribute(attribute, value)
     end
 end)
 

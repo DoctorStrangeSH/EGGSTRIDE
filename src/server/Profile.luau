@@ -7,6 +7,7 @@ function Profile.new(startCoins)
     return {
         version = Profile.VERSION, coins = startCoins, tier = 1, owned = {},
         equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
+        muteRunSounds = false, reduceCardMotion = false,
     }
 end
 
@@ -23,6 +24,8 @@ function Profile.read(stored, catalog, rules)
 
     local record = Profile.new(stored.coins)
     record.tier = stored.tier
+    record.muteRunSounds = stored.muteRunSounds == true
+    record.reduceCardMotion = stored.reduceCardMotion == true
     record.stormTrailUnlocked = stored.stormTrailUnlocked == true
     if type(stored.deliveryRecords) == "table" then
         for _, vault in ipairs(rules.Vaults) do
@@ -61,6 +64,8 @@ end
 function Profile.snapshot(entry)
     local record = Profile.new(entry.coins)
     record.tier = entry.tier
+    record.muteRunSounds = entry.muteRunSounds == true
+    record.reduceCardMotion = entry.reduceCardMotion == true
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true
     record.deliveryRecords = table.clone(entry.deliveryRecords)
     record.weeklyRecord = entry.weeklyRecord
