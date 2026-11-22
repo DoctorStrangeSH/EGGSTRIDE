@@ -115,6 +115,8 @@ function RunFeedback.connect(gui, event, rules, player)
             local heading = if isBest then "Личный рекорд недели" else "Забег завершён"
             show(heading, rules.deliveryTimeText(milliseconds) .. " · " .. result, Color3.fromRGB(255, 209, 117))
             play(hatchSound)
+        elseif kind == "WeeklyCancelled" then
+            show("Попытка отменена", "Ты вернулся в лагерь.", Color3.fromRGB(255, 209, 117))
         elseif kind == "WeeklyStopped" then
             local description = ...
             show("Забег прерван", description, Color3.fromRGB(255, 147, 137))

@@ -48,6 +48,10 @@ local runFeedback = Instance.new("RemoteEvent")
 runFeedback.Name = "RunFeedback"
 runFeedback.Parent = Shared
 
+local cancelWeekly = Instance.new("RemoteEvent")
+cancelWeekly.Name = "CancelWeekly"
+cancelWeekly.Parent = Shared
+
 local updatePreference = Instance.new("RemoteEvent")
 updatePreference.Name = "UpdatePreference"
 updatePreference.Parent = Shared
@@ -389,11 +393,32 @@ local function updateWind(player, entry, humanoid, root, now, open)
     end
 end
 
-local function finishWeekly(player, entry, root, now, week, completed)
-    local attempt = entry.weekly
+local function returnFromWeekly(player, entry, root)
     stopWeekly(player, entry)
     player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
     root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+end
+
+cancelWeekly.OnServerEvent:Connect(function(player, startsAt)
+    local entry = entries[player]
+    local attempt = entry and entry.weekly
+    if closing or not attempt or startsAt ~= attempt.startsAt then
+        return
+    end
+    local humanoid, root = characterParts(player)
+    if not humanoid or humanoid.Health <= 0 or not root then
+        return
+    end
+
+    returnFromWeekly(player, entry, root)
+    publish(player, entry, "Попытка отменена. Новый забег можно начать из лагеря.")
+    runFeedback:FireClient(player, "WeeklyCancelled")
+end)
+
+local function finishWeekly(player, entry, root, now, week, completed)
+    local attempt = entry.weekly
+    returnFromWeekly(player, entry, root)
     if not completed then
         publish(player, entry, "Забег недели прерван. Попробуй снова из лагеря.")
         runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")

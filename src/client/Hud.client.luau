@@ -4,6 +4,7 @@ local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
 local round = shared:WaitForChild("Round")
+local cancelWeekly = shared:WaitForChild("CancelWeekly")
 local RunFeedback = require(script.Parent:WaitForChild("RunFeedback"))
 local gateTarget = round:WaitForChild("Gate")
 local eggTarget = round:WaitForChild("FirstEgg")
@@ -87,6 +88,58 @@ waypointText.TextSize = 15
 waypointText.Parent = waypoint
 Instance.new("UICorner", waypointText).CornerRadius = UDim.new(0, 8)
 
+local exitControls = Instance.new("Frame")
+exitControls.Name = "WeeklyExit"
+exitControls.AnchorPoint = Vector2.new(0.5, 0)
+exitControls.Position = UDim2.new(0.5, 0, 0, 196)
+exitControls.Size = UDim2.fromOffset(244, 44)
+exitControls.BackgroundTransparency = 1
+exitControls.Visible = false
+exitControls.Parent = gui
+
+local function exitButton(name, caption, x, width, background, foreground)
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Text = caption
+    button.Position = UDim2.fromOffset(x, 0)
+    button.Size = UDim2.fromOffset(width, 44)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 13
+    button.BackgroundColor3 = background
+    button.TextColor3 = foreground
+    button.Parent = exitControls
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
+    return button
+end
+
+local exit = exitButton("Exit", "Выйти из забега", 44, 156, colors.ink, colors.white)
+local confirm = exitButton("ConfirmExit", "Выйти в лагерь", 0, 118, colors.gold, colors.ink)
+local resume = exitButton("ResumeRun", "Продолжить", 126, 118, colors.ink, colors.white)
+local exitAttempt
+
+local function showExitConfirmation(shown)
+    exit.Visible = not shown
+    confirm.Visible = shown
+    resume.Visible = shown
+end
+
+showExitConfirmation(false)
+exit.Activated:Connect(function()
+    exitAttempt = player:GetAttribute("WeeklyStartsAt")
+    showExitConfirmation(exitAttempt ~= nil)
+end)
+resume.Activated:Connect(function()
+    exitAttempt = nil
+    showExitConfirmation(false)
+end)
+confirm.Activated:Connect(function()
+    if exitAttempt and exitAttempt == player:GetAttribute("WeeklyStartsAt") then
+        cancelWeekly:FireServer(exitAttempt)
+    end
+    exitAttempt = nil
+    showExitConfirmation(false)
+end)
+
 local function update()
     local egg = player:GetAttribute("EggName")
     local ability = Rules.Abilities[player:GetAttribute("EggAbility")]
@@ -118,6 +171,12 @@ local function update()
     elseif step == 3 and (not egg or egg == "") then
         objective.Text = "Открой «Питомцы» и попробуй новый забег"
     end
+    local weeklyStart = player:GetAttribute("WeeklyStartsAt")
+    exitControls.Visible = weeklyStart ~= nil
+    if exitAttempt and exitAttempt ~= weeklyStart then
+        exitAttempt = nil
+        showExitConfirmation(false)
+    end
     local weeklyStep = player:GetAttribute("WeeklyStep")
     local weeklyPoint = weeklyTargets[Rules.Weekly.order[weeklyStep]]
     if weeklyPoint then
@@ -127,7 +186,7 @@ local function update()
         pet.Text = if weeklyStep > Rules.Weekly.eggStep then "Несёшь тренировочное яйцо" else "Путь к тренировочному яйцу"
         target = weeklyPoint.Value
         waypointText.Text = progress .. "  ↓"
-    elseif player:GetAttribute("WeeklyStartsAt") then
+    elseif weeklyStart then
         stats.Text = "Забег недели · скорость " .. Rules.Weekly.tier .. " для всех"
         pet.Text = ""
         objective.Text = "Приготовься к старту"
