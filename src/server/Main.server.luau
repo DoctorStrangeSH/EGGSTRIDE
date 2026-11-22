@@ -207,6 +207,9 @@ local function stopWeekly(player, entry)
     end
     local attempt = entry.weekly
     attempt.partConnection:Disconnect()
+    if attempt.startRoot and attempt.startRoot.Parent then
+        attempt.startRoot.Anchored = false
+    end
     for part, group in pairs(attempt.collisionGroups) do
         if part.Parent then
             part.CollisionGroup = group
@@ -217,6 +220,7 @@ local function stopWeekly(player, entry)
     end
     entry.weekly = nil
     entry.nextWeeklyStart = workspace:GetServerTimeNow() + 1
+    player:SetAttribute("WeeklyStartsAt", nil)
     player:SetAttribute("WeeklyEndsAt", nil)
     player:SetAttribute("WeeklyStep", nil)
     applySpeed(player, entry)
@@ -304,6 +308,7 @@ local function join(player)
             if entry.weekly then
                 stopWeekly(player, entry)
                 publish(player, entry, "Забег недели прерван. Попробуй ещё раз из лагеря.")
+                runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")
             end
             local lost = entry.egg ~= nil
             clearEgg(player, entry)
@@ -390,7 +395,8 @@ local function finishWeekly(player, entry, root, now, week, completed)
     player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
     root.AssemblyLinearVelocity = Vector3.zero
     if not completed then
-        publish(player, entry, "Забег недели истёк. Попробуй снова из лагеря.")
+        publish(player, entry, "Забег недели прерван. Попробуй снова из лагеря.")
+        runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")
         return
     end
 
@@ -408,7 +414,12 @@ local function finishWeekly(player, entry, root, now, week, completed)
     end
     local message = if best then "Личный рекорд недели · " else "Забег завершён · "
     local qualification = if attempt.rankable then "" else " · вне рейтинга"
-    publish(player, entry, message .. Rules.deliveryTimeText(math.round(elapsed * 1000)) .. qualification)
+    local milliseconds = math.round(elapsed * 1000)
+    publish(player, entry, message .. Rules.deliveryTimeText(milliseconds) .. qualification)
+    local result = if not attempt.rankable then "Вне рейтинга"
+        elseif rankedBest then "Допущен к рейтингу"
+        else "В рейтинге остаётся лучшее время"
+    runFeedback:FireClient(player, "WeeklyFinish", milliseconds, best ~= nil, result)
 end
 
 local displayedWeek
@@ -464,8 +475,18 @@ local function syncRound()
         end
         local attempt = entry.weekly
         if attempt and root and humanoid and humanoid.Health > 0 then
-            if now >= attempt.endsAt or attempt.week ~= week or ProfileStore.expired(entry.session) then
+            if attempt.week ~= week or ProfileStore.expired(entry.session) or (attempt.endsAt and now >= attempt.endsAt) then
                 finishWeekly(player, entry, root, now, week, false)
+            elseif attempt.startRoot then
+                if now >= attempt.startsAt then
+                    attempt.startRoot.Anchored = false
+                    attempt.startRoot = nil
+                    attempt.startedAt = now
+                    attempt.endsAt = now + Rules.Weekly.duration
+                    attempt.lastCheckpointAt = now
+                    player:SetAttribute("WeeklyEndsAt", attempt.endsAt)
+                    player:SetAttribute("WeeklyStep", attempt.step)
+                end
             else
                 local point = map.weekly.points[Rules.Weekly.order[attempt.step]].Position
                 if (root.Position - point).Magnitude <= Rules.Weekly.checkpointRadius then
@@ -498,6 +519,9 @@ local function syncRound()
 end
 
 withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
+    if root.Anchored then
+        return
+    end
     if entry.egg then
         publish(player, entry, "Сначала доставь яйцо в инкубатор.")
         return
@@ -508,9 +532,9 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     end
     local character = player.Character
     local attempt = {
-        startedAt = now, endsAt = now + Rules.Weekly.duration, week = Rules.weekId(os.time()),
+        startsAt = now + Rules.Weekly.countdown, startRoot = root, week = Rules.weekId(os.time()),
         step = 1, collisionGroups = {}, rankable = true,
-        lastPoint = map.weekly.points.Finish.Position, lastCheckpointAt = now,
+        lastPoint = map.weekly.points.Finish.Position,
     }
     local function setRunnerCollision(part)
         if part:IsA("BasePart") and not attempt.collisionGroups[part] then
@@ -527,9 +551,9 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     player.Character:PivotTo(CFrame.lookAt(start, start + Vector3.new(-1, 0, 0)))
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
+    root.Anchored = true
     applySpeed(player, entry)
-    player:SetAttribute("WeeklyStep", attempt.step)
-    player:SetAttribute("WeeklyEndsAt", attempt.endsAt)
+    player:SetAttribute("WeeklyStartsAt", attempt.startsAt)
     publish(player, entry, "Пройди метки, возьми яйцо и вернись на финиш.")
 end)
 

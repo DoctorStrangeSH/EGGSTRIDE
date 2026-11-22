@@ -3,7 +3,7 @@ local Rules = {}
 Rules.PrepareSeconds = 9
 Rules.RunSeconds = 25
 Rules.Weekly = {
-    duration = 35, tier = 2, checkpointRadius = 6, eggStep = 3,
+    countdown = 3, duration = 35, tier = 2, checkpointRadius = 6, eggStep = 3,
     order = { "First", "Second", "Egg", "Second", "First", "Finish" },
     labels = { "Добеги до метки 1", "Добеги до метки 2", "Забери тренировочное яйцо",
         "Вернись к метке 2", "Вернись к метке 1", "Вернись на финиш" },

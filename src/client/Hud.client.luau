@@ -127,6 +127,11 @@ local function update()
         pet.Text = if weeklyStep > Rules.Weekly.eggStep then "Несёшь тренировочное яйцо" else "Путь к тренировочному яйцу"
         target = weeklyPoint.Value
         waypointText.Text = progress .. "  ↓"
+    elseif player:GetAttribute("WeeklyStartsAt") then
+        stats.Text = "Забег недели · скорость " .. Rules.Weekly.tier .. " для всех"
+        pet.Text = ""
+        objective.Text = "Приготовься к старту"
+        target = nil
     end
     waypoint.Adornee = if weeklyPoint then target else nil
     waypoint.Enabled = waypoint.Adornee ~= nil
@@ -136,7 +141,7 @@ local function update()
     notice.Text = wind or player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyStep" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do
@@ -148,6 +153,7 @@ end
 update()
 
 while true do
+    local weeklyStart = player:GetAttribute("WeeklyStartsAt")
     local start = round:GetAttribute("StartedAt")
     if start then
         local open, left = Rules.clock(math.max(0, workspace:GetServerTimeNow() - start))
@@ -160,13 +166,17 @@ while true do
         timer.Text = string.format("%s  ·  %02d сек", phase, left)
         timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
         local egg = player:GetAttribute("EggName")
-        updateFeedback(open, left, egg ~= nil and egg ~= "", player:GetAttribute("WeeklyEndsAt") ~= nil)
+        updateFeedback(open, left, egg ~= nil and egg ~= "", weeklyStart ~= nil)
     end
     local endsAt = player:GetAttribute("WeeklyEndsAt")
     if endsAt then
         local left = math.max(0, math.ceil(endsAt - workspace:GetServerTimeNow()))
         timer.Text = string.format("ЗАБЕГ НЕДЕЛИ  ·  %02d сек", left)
         timer.TextColor3 = if left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
+    elseif weeklyStart then
+        local left = math.max(1, math.ceil(weeklyStart - workspace:GetServerTimeNow()))
+        timer.Text = string.format("СТАРТ ЧЕРЕЗ  ·  %d", left)
+        timer.TextColor3 = colors.gold
     end
     task.wait(0.2)
 end

@@ -100,8 +100,9 @@ function RunFeedback.connect(gui, event, rules, player)
         end)
     end
 
-    event.OnClientEvent:Connect(function(kind, petName, rarity, coins, isNew, rewardName, personalBest)
+    event.OnClientEvent:Connect(function(kind, ...)
         if kind == "Hatch" then
+            local petName, rarity, coins, isNew, rewardName, personalBest = ...
             local accent = if rarity == "Редкий" then Color3.fromRGB(255, 209, 117) else Color3.fromRGB(163, 255, 201)
             local collection = if rewardName then "\nНаграда · " .. rewardName
                 elseif personalBest then "\nЛичный рекорд · " .. rules.deliveryTimeText(personalBest)
@@ -109,6 +110,15 @@ function RunFeedback.connect(gui, event, rules, player)
             show(if isNew then petName .. " · новый вид" else petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
             hatchSound.PlaybackSpeed = if rarity == "Редкий" then 1.28 else 1.10
             play(hatchSound)
+        elseif kind == "WeeklyFinish" then
+            local milliseconds, isBest, result = ...
+            local heading = if isBest then "Личный рекорд недели" else "Забег завершён"
+            show(heading, rules.deliveryTimeText(milliseconds) .. " · " .. result, Color3.fromRGB(255, 209, 117))
+            play(hatchSound)
+        elseif kind == "WeeklyStopped" then
+            local description = ...
+            show("Забег прерван", description, Color3.fromRGB(255, 147, 137))
+            play(lossSound)
         elseif kind == "Timeout" or kind == "Fall" then
             local description = if kind == "Timeout" then "Ворота закрылись. Попробуй ещё раз." else "Ты потерял яйцо при падении. Попробуй снова из лагеря."
             show("Яйцо потеряно", description, Color3.fromRGB(255, 147, 137))
