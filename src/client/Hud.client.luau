@@ -1,0 +1,81 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local shared = ReplicatedStorage:WaitForChild("Eggstride")
+local Rules = require(shared:WaitForChild("Rules"))
+local round = shared:WaitForChild("Round")
+
+local colors = {
+    ink = Color3.fromRGB(37, 34, 65),
+    white = Color3.fromRGB(255, 251, 231),
+    gold = Color3.fromRGB(255, 209, 117),
+    mint = Color3.fromRGB(163, 255, 201),
+}
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "EggstrideHud"
+gui.ResetOnSpawn = false
+gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local panel = Instance.new("Frame")
+panel.AnchorPoint = Vector2.new(0.5, 0)
+panel.Position = UDim2.new(0.5, 0, 0, 9)
+panel.Size = UDim2.new(0.94, 0, 0, 130)
+panel.BackgroundColor3 = colors.ink
+panel.BackgroundTransparency = 0.06
+panel.Parent = gui
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
+Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(420, 130)
+
+local function label(name, y, height, size, color)
+    local item = Instance.new("TextLabel")
+    item.Name = name
+    item.Position = UDim2.new(0, 12, 0, y)
+    item.Size = UDim2.new(1, -24, 0, height)
+    item.BackgroundTransparency = 1
+    item.Font = Enum.Font.GothamBold
+    item.Text = ""
+    item.TextSize = size
+    item.TextColor3 = color
+    item.TextWrapped = true
+    item.Parent = panel
+    return item
+end
+
+local timer = label("Timer", 5, 26, 17, colors.gold)
+local stats = label("Stats", 30, 22, 15, colors.white)
+local pet = label("Pet", 53, 19, 13, colors.mint)
+local objective = label("Objective", 74, 22, 13, colors.gold)
+local notice = label("Notice", 94, 32, 12, colors.white)
+
+local function update()
+    local egg = player:GetAttribute("EggName")
+    local best = player:GetAttribute("BestPet")
+    local tier = player:GetAttribute("SpeedTier") or 1
+    local cost = Rules.UpgradeCosts[tier]
+    stats.Text = string.format("Монеты %d  ·  Скорость %d/5", player:GetAttribute("Coins") or 0, tier)
+    pet.Text = if egg and egg ~= "" then "Несёшь яйцо: " .. egg
+        elseif best and best ~= "" then "Питомец: " .. best
+        else "Питомец появится после вылупления"
+    objective.Text = if egg and egg ~= "" then "Цель: успей к инкубатору"
+        elseif player:GetAttribute("Delivered") then "Яйцо спасено · жди следующего забега"
+        elseif cost then "Следующая тренировка: " .. cost .. " монет"
+        else "Выбирай остров и возвращайся до закрытия"
+    notice.Text = player:GetAttribute("Notice") or ""
+end
+
+for _, name in ipairs({ "Coins", "SpeedTier", "EggName", "BestPet", "Delivered", "Notice" }) do
+    player:GetAttributeChangedSignal(name):Connect(update)
+end
+update()
+
+while true do
+    local start = round:GetAttribute("StartedAt")
+    if start then
+        local open, left = Rules.clock(math.max(0, workspace:GetServerTimeNow() - start))
+        timer.Text = string.format("%s  ·  %02d сек", if open then "ЗАБЕГ" else "ПОДГОТОВКА", left)
+        timer.TextColor3 = if open and left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
+    end
+    task.wait(0.2)
+end

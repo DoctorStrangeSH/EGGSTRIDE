@@ -1,0 +1,35 @@
+{
+  "name": "EGGSTRIDE",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Eggstride": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$path": "src/server"
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "src/client"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "FallenPartsDestroyHeight": -35
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "Nature": {
+        "$path": "assets/Nature.rbxm"
+      }
+    }
+  }
+}

@@ -1,0 +1,170 @@
+local Lighting = game:GetService("Lighting")
+local ServerStorage = game:GetService("ServerStorage")
+
+local World = {}
+local Colors = {
+    grass = Color3.fromRGB(113, 213, 129),
+    rock = Color3.fromRGB(91, 103, 143),
+    wood = Color3.fromRGB(212, 155, 93),
+    cream = Color3.fromRGB(255, 223, 155),
+    plum = Color3.fromRGB(40, 37, 73),
+    azure = Color3.fromRGB(123, 208, 250),
+    amber = Color3.fromRGB(255, 178, 76),
+    lilac = Color3.fromRGB(182, 150, 255),
+}
+World.VaultColors = { Colors.cream, Colors.amber, Colors.lilac }
+
+local function part(parent, name, size, position, color, collision)
+    local prop = Instance.new("Part")
+    prop.Name = name
+    prop.Size = size
+    prop.Position = position
+    prop.Color = color
+    prop.Material = Enum.Material.SmoothPlastic
+    prop.Anchored = true
+    prop.CanCollide = collision
+    prop.CanTouch = false
+    prop.TopSurface = Enum.SurfaceType.Smooth
+    prop.BottomSurface = Enum.SurfaceType.Smooth
+    prop.Parent = parent
+    return prop
+end
+
+local function sign(anchor, title, subtitle)
+    local plate = Instance.new("BillboardGui")
+    plate.Size = UDim2.fromScale(13, 4)
+    plate.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
+    plate.MaxDistance = 55
+    plate.LightInfluence = 0
+    plate.AlwaysOnTop = true
+    plate.Parent = anchor
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundColor3 = Colors.plum
+    label.BackgroundTransparency = 0.07
+    label.TextColor3 = Colors.cream
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.Text = title .. "\n" .. subtitle
+    label.Parent = plate
+    Instance.new("UICorner", label).CornerRadius = UDim.new(0.2, 0)
+    Instance.new("UIPadding", label).PaddingBottom = UDim.new(0.1, 0)
+end
+
+local function prompt(anchor, action, object)
+    local interaction = Instance.new("ProximityPrompt")
+    interaction.ActionText = action
+    interaction.ObjectText = object
+    interaction.MaxActivationDistance = 12
+    interaction.RequiresLineOfSight = false
+    interaction.Parent = anchor
+    return interaction
+end
+
+local function island(parent, x, width, depth, turf)
+    part(parent, "Основание", Vector3.new(width - 4, 8, depth - 4), Vector3.new(x, -6, 0), Colors.rock, false)
+    part(parent, "Трава", Vector3.new(width, 2, depth), Vector3.new(x, -1, 0), turf, true)
+end
+
+local function vegetation(parent, name, x, z, size, angle)
+    local mesh = ServerStorage.Nature[name]:Clone()
+    mesh.Anchored = true
+    mesh.CanCollide = false
+    mesh.CanTouch = false
+    mesh.CanQuery = false
+    mesh.Size = size
+    mesh.CFrame = CFrame.new(x, size.Y / 2, z) * CFrame.Angles(0, angle, 0)
+    mesh.Parent = parent
+end
+
+local function runway(parent, fromX, toX)
+    local center = (fromX + toX) / 2
+    part(parent, "Мост", Vector3.new(toX - fromX, 1, 13), Vector3.new(center, -0.5, 0), Colors.wood, true)
+    for _, z in ipairs({ -6, 6 }) do
+        part(parent, "Бортик", Vector3.new(toX - fromX, 0.6, 0.5), Vector3.new(center, 0.3, z), Colors.cream, false)
+    end
+end
+
+function World.build(rules)
+    Lighting.ClockTime = 14
+    Lighting.Brightness = 2.4
+    Lighting.Ambient = Color3.fromRGB(144, 153, 174)
+    Lighting.OutdoorAmbient = Color3.fromRGB(175, 182, 201)
+
+    local scene = Instance.new("Folder")
+    scene.Name = "EggstrideWorld"
+    scene.Parent = workspace
+
+    local atmosphere = Instance.new("Atmosphere")
+    atmosphere.Density = 0.18
+    atmosphere.Color = Color3.fromRGB(204, 232, 255)
+    atmosphere.Parent = Lighting
+
+    island(scene, 0, 50, 52, Colors.grass)
+    local spawn = Instance.new("SpawnLocation")
+    spawn.Name = "Camp"
+    spawn.Position = Vector3.new(0, 0.1, 0)
+    spawn.Size = Vector3.new(8, 0.2, 8)
+    spawn.Anchored = true
+    spawn.Transparency = 1
+    spawn.CanCollide = false
+    spawn.Neutral = true
+    spawn.Duration = 0
+    spawn.Parent = scene
+
+    for _, z in ipairs({ -13, 13 }) do
+        vegetation(scene, "RoundTree", -17, z, Vector3.new(10, 13, 10), z)
+        vegetation(scene, "Pine", 19, z * 1.4, Vector3.new(8, 14, 8), -z)
+        vegetation(scene, "Rock", 7, z * 1.5, Vector3.new(6, 3, 4), z)
+    end
+
+    local hatch = part(scene, "Инкубатор", Vector3.new(8, 0.4, 8), Vector3.new(14, 0.2, 0), Colors.cream, true)
+    local shop = part(scene, "Тренировка", Vector3.new(7, 0.4, 7), Vector3.new(-6, 0.2, 11), Colors.azure, true)
+    sign(hatch, "ИНКУБАТОР", "Сдай яйцо")
+    sign(shop, "ТРЕНИРОВКА", "Увеличь скорость")
+
+    runway(scene, 24, 50)
+    local gate = part(scene, "Ворота", Vector3.new(1, 10, 13), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
+    gate.Material = Enum.Material.Neon
+    gate.Transparency = 0.35
+
+    local vaultPrompts = {}
+    local previousX
+    for index, vault in ipairs(rules.Vaults) do
+        local accent = World.VaultColors[index]
+        if previousX then
+            runway(scene, previousX + 13, vault.x - 13)
+        end
+        island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))
+        local treeName = if index == 1 then "RoundTree" else "Pine"
+        for _, z in ipairs({ -11, 11 }) do
+            vegetation(scene, treeName, vault.x + 8, z, Vector3.new(7, 11 + index, 7), z * index)
+            vegetation(scene, "Rock", vault.x - 7, z, Vector3.new(4, 2.5, 3.5), z)
+        end
+        part(scene, "Пьедестал", Vector3.new(5, 1, 5), Vector3.new(vault.x, 0.5, 0), Colors.plum, false)
+        local egg = part(scene, "Яйцо", Vector3.new(2.4, 3.2, 2.4), Vector3.new(vault.x, 2.6, 0), accent, false)
+        egg.Shape = Enum.PartType.Ball
+        sign(egg, vault.name, "Скорость " .. vault.tier)
+        vaultPrompts[index] = prompt(egg, "Забрать яйцо", vault.name)
+        previousX = vault.x
+    end
+
+    local random = Random.new(73)
+    for i = 1, 30 do
+        local cloud = part(scene, "Облако", Vector3.new(20, 5, 10),
+            Vector3.new(random:NextNumber(-45, 285), random:NextNumber(-27, -10), random:NextNumber(31, 61) * (if i % 2 == 0 then 1 else -1)),
+            Color3.fromRGB(239, 247, 255), false)
+        cloud.Shape = Enum.PartType.Ball
+    end
+
+    return {
+        spawn = spawn,
+        gate = gate,
+        hatch = prompt(hatch, "Вылупить", "Инкубатор"),
+        shop = prompt(shop, "Тренироваться", "Скорость"),
+        vaults = vaultPrompts,
+    }
+end
+
+return World
