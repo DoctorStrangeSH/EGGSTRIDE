@@ -11,8 +11,8 @@ Rules.Vaults = {
     {
         name = "Луговой", x = 63, tier = 1, coins = 32,
         pets = {
-            common = { name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
-            rare = { name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
+            common = { id = "leaf_tail", name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
+            rare = { id = "dew_moth", name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
         },
         eggs = {
             { id = "leaf_shell", name = "Листовое яйцо", rarity = "Обычное", weight = 80, ability = "Лиана", color = { 176, 220, 111 } },
@@ -22,8 +22,8 @@ Rules.Vaults = {
     {
         name = "Янтарный", x = 143, tier = 2, coins = 54,
         pets = {
-            common = { name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
-            rare = { name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
+            common = { id = "amber_crab", name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
+            rare = { id = "prism_fox", name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
         },
         eggs = {
             { id = "amber_shell", name = "Янтарное яйцо", rarity = "Обычное", weight = 85, color = { 255, 178, 76 } },
@@ -33,8 +33,8 @@ Rules.Vaults = {
     {
         name = "Грозовой", x = 252, tier = 4, coins = 95,
         pets = {
-            common = { name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
-            rare = { name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
+            common = { id = "thunder_puff", name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
+            rare = { id = "lightning_kite", name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
         },
         eggs = {
             { id = "thunder_shell", name = "Грозовое яйцо", rarity = "Обычное", weight = 90, color = { 182, 150, 255 } },

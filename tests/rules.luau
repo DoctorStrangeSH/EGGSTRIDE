@@ -26,8 +26,14 @@ for _, vault in ipairs(Rules.Vaults) do
     local home = (vault.x - 14) / Rules.speed(vault.tier, true)
     assert(outward + home < Rules.RunSeconds, "Impossible minimum-tier route: " .. vault.name)
 end
-local species = {}
+local shellIds = {}
+local petIds = {}
 for _, vault in ipairs(Rules.Vaults) do
+    for _, pet in pairs(vault.pets) do
+        assert(pet.id:match("^[a-z_]+$") and #pet.id <= 32, "Invalid companion id: " .. pet.id)
+        assert(not petIds[pet.id], "Duplicate companion id: " .. pet.id)
+        petIds[pet.id] = true
+    end
     local counts = {}
     for roll = 1, 100 do
         local egg = Rules.eggForRoll(vault, roll)
@@ -35,8 +41,8 @@ for _, vault in ipairs(Rules.Vaults) do
     end
     for _, egg in ipairs(vault.eggs) do
         assert(counts[egg] == egg.weight, "Uneven pool: " .. egg.id)
-        assert(not species[egg.id], "Species appears in multiple biome pools: " .. egg.id)
-        species[egg.id] = true
+        assert(not shellIds[egg.id], "Species appears in multiple biome pools: " .. egg.id)
+        shellIds[egg.id] = true
         local rare = 0
         for roll = 1, 100 do
             local result = Rules.hatchForRoll(vault, egg, roll)

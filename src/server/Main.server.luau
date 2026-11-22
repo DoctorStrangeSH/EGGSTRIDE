@@ -11,6 +11,10 @@ round.Name = "Round"
 round:SetAttribute("StartedAt", startedAt)
 round.Parent = Shared
 
+local equipPet = Instance.new("RemoteEvent")
+equipPet.Name = "EquipPet"
+equipPet.Parent = Shared
+
 local entries = {}
 
 local function characterParts(player)
@@ -31,6 +35,7 @@ end
 local function publish(player, entry, message)
     player:SetAttribute("Coins", entry.coins)
     player:SetAttribute("SpeedTier", entry.tier)
+    player:SetAttribute("EquippedPetId", entry.pet and entry.pet.id or "")
     player:SetAttribute("EquippedPet", entry.pet and (entry.pet.name .. " · " .. entry.pet.rarity) or "")
     player:SetAttribute("EggName", entry.egg and entry.egg.name or "")
     player:SetAttribute("EggAbility", entry.egg and not entry.abilityUsed and entry.egg.ability or "")
@@ -88,7 +93,7 @@ local function join(player)
     if entries[player] then
         return
     end
-    local entry = { coins = Rules.StartCoins, tier = 1, delivered = false }
+    local entry = { coins = Rules.StartCoins, tier = 1, delivered = false, ownedPets = {}, nextEquipAt = 0 }
     entries[player] = entry
     publish(player, entry, "Заработай скорость в лагере или сразу попробуй ближайший остров.")
     player.RespawnLocation = map.spawn
@@ -229,9 +234,17 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
     entry.delivered = true
     entry.coins += vault.coins
     local pet = Rules.hatchForRoll(vault, egg, random:NextInteger(1, 100))
-    entry.pet = pet
-    showPet(root, pet)
-    publish(player, entry, "Вылупился " .. pet.name .. " (" .. pet.rarity .. ")" .. " · +" .. vault.coins .. " монет.")
+    local isNew = entry.ownedPets[pet.id] == nil
+    if isNew then
+        entry.ownedPets[pet.id] = pet
+        player:SetAttribute("OwnsPet_" .. pet.id, true)
+    end
+    if not entry.pet then
+        entry.pet = pet
+        showPet(root, pet)
+    end
+    local result = if isNew then "Новый в журнале: " else "Вылупился "
+    publish(player, entry, result .. pet.name .. " · " .. pet.rarity .. " · +" .. vault.coins .. " монет.")
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)
@@ -246,6 +259,29 @@ withNearbyPlayer(map.shop, function(player, entry)
         applySpeed(player, entry)
         publish(player, entry, "Скорость повышена до уровня " .. entry.tier .. ".")
     end
+end)
+
+equipPet.OnServerEvent:Connect(function(player, petId)
+    local entry = entries[player]
+    if not entry or typeof(petId) ~= "string" or #petId > 32 then
+        return
+    end
+    local now = os.clock()
+    if now < entry.nextEquipAt then
+        return
+    end
+    entry.nextEquipAt = now + 0.25
+
+    local pet = entry.ownedPets[petId]
+    if not pet or pet == entry.pet then
+        return
+    end
+    entry.pet = pet
+    local humanoid, root = characterParts(player)
+    if humanoid and humanoid.Health > 0 and root then
+        showPet(root, pet)
+    end
+    publish(player, entry, "Спутник выбран: " .. pet.name .. ".")
 end)
 
 syncRound()
