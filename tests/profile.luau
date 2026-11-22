@@ -20,7 +20,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 local pet = catalog.dew_moth
 local entry = {
     coins = 77, tier = 2, ownedPets = { [pet.id] = pet }, pet = pet,
-    onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, delivered = true, egg = Rules.Vaults[1].eggs[1],
+    onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320 }, delivered = true, egg = Rules.Vaults[1].eggs[1],
 }
 local snapshot = Profile.snapshot(entry)
 assert(snapshot.coins == 77 and snapshot.tier == 2 and snapshot.equipped == pet.id and snapshot.onboarding == 3)
@@ -40,9 +40,12 @@ local rejoined = Profile.acquire(released, "server_c", 331, catalog, Rules)
 assert(rejoined.equipped == pet.id and rejoined.coins == 77 and rejoined.tier == 2 and rejoined.onboarding == 3 and rejoined.stormTrailUnlocked)
 
 assert(rejoined.deliveryRecords.meadow == 8420)
+assert(rejoined.weeklyRecord.week == 20 and rejoined.weeklyRecord.time == 14320)
 assert(not next(Profile.read({version = 1, coins = 15, tier = 1, owned = {}}, catalog, Rules).deliveryRecords))
 snapshot.deliveryRecords.unknown = 5000
 snapshot.deliveryRecords.amber = -1
+snapshot.weeklyRecord = { week = 20, time = 999999 }
+assert(Profile.read(snapshot, catalog, Rules).weeklyRecord == nil)
 local validatedRecords = Profile.read(snapshot, catalog, Rules).deliveryRecords
 assert(validatedRecords.meadow == 8420 and validatedRecords.unknown == nil and validatedRecords.amber == nil)
 snapshot.onboarding = nil

@@ -2,6 +2,12 @@ local Rules = {}
 
 Rules.PrepareSeconds = 9
 Rules.RunSeconds = 25
+Rules.Weekly = {
+    duration = 35, tier = 2, checkpointRadius = 6, eggStep = 3,
+    order = { "First", "Second", "Egg", "Second", "First", "Finish" },
+    labels = { "Добеги до метки 1", "Добеги до метки 2", "Забери тренировочное яйцо",
+        "Вернись к метке 2", "Вернись к метке 1", "Вернись на финиш" },
+}
 Rules.CarryMultiplier = 0.75
 Rules.StartCoins = 15
 Rules.GateX = 28
@@ -83,8 +89,8 @@ function Rules.hatchForRoll(vault, egg, roll)
     return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
 end
 
-function Rules.improvedDelivery(previous, elapsed)
-    if not (elapsed > 0 and elapsed <= Rules.RunSeconds) then
+function Rules.improvedDelivery(previous, elapsed, limit)
+    if not (elapsed > 0 and elapsed <= (limit or Rules.RunSeconds)) then
         return nil
     end
     local milliseconds = math.max(1, math.round(elapsed * 1000))
@@ -92,6 +98,14 @@ function Rules.improvedDelivery(previous, elapsed)
         return milliseconds
     end
     return nil
+end
+
+function Rules.weekId(timestamp)
+    return math.floor((timestamp - 4 * 86400) / (7 * 86400))
+end
+
+function Rules.weeklyBest(record, week)
+    return if record and record.week == week then record.time else nil
 end
 
 function Rules.deliveryTimeText(milliseconds)

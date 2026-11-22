@@ -32,6 +32,11 @@ function Profile.read(stored, catalog, rules)
             end
         end
     end
+    local weekly = stored.weeklyRecord
+    if type(weekly) == "table" and wholeNumber(weekly.week, 0, 9e15)
+        and wholeNumber(weekly.time, 1, rules.Weekly.duration * 1000) then
+        record.weeklyRecord = { week = weekly.week, time = weekly.time }
+    end
     for id, owned in pairs(stored.owned) do
         if owned == true and catalog[id] then
             record.owned[id] = true
@@ -55,6 +60,7 @@ function Profile.snapshot(entry)
     record.tier = entry.tier
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true
     record.deliveryRecords = table.clone(entry.deliveryRecords)
+    record.weeklyRecord = entry.weeklyRecord
     record.onboarding = entry.onboarding
     for id in pairs(entry.ownedPets) do
         record.owned[id] = true

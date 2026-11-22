@@ -90,10 +90,10 @@ function RunFeedback.connect(gui, event, rules)
 
     local previousOpen
     local previousSecond
-    return function(open, seconds, carrying)
-        if open and previousOpen == false then
+    return function(open, seconds, carrying, muted)
+        if not muted and open and previousOpen == false then
             startSound:Play()
-        elseif open and carrying and seconds <= 3 and seconds ~= previousSecond then
+        elseif not muted and open and carrying and seconds <= 3 and seconds ~= previousSecond then
             tickSound:Play()
         end
         previousOpen = open

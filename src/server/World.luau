@@ -215,6 +215,37 @@ function World.flashRelay(relay)
     end)
 end
 
+local function buildWeekly(parent)
+    local hall = part(parent, "Трасса недели", Vector3.new(122, 2, 36),
+        Vector3.new(-160, -1, 0), Colors.rock, true)
+    hall.Material = Enum.Material.SmoothPlastic
+    for _, barrier in ipairs({ { x = -138, z = 5 }, { x = -167, z = -5 } }) do
+        part(parent, "Барьер", Vector3.new(3, 10, 26), Vector3.new(barrier.x, 5, barrier.z), Colors.plum, true)
+    end
+
+    local points = {}
+    for _, marker in ipairs({
+        { id = "Finish", x = -108, z = 0, title = "СТАРТ И ФИНИШ" },
+        { id = "First", x = -138, z = -13, title = "МЕТКА 1" },
+        { id = "Second", x = -167, z = 13, title = "МЕТКА 2" },
+        { id = "Egg", x = -206, z = 0, title = "ТРЕНИРОВОЧНОЕ ЯЙЦО" },
+    }) do
+        local plate = part(parent, marker.id, Vector3.new(7, 0.16, 7), Vector3.new(marker.x, 0.08, marker.z),
+            if marker.id == "Egg" then Colors.cream else Colors.azure, false)
+        plate.Material = Enum.Material.Neon
+        points[marker.id] = plate.Position
+        sign(plate, marker.title, if marker.id == "Egg" then "Вернись через обе метки" else "Забег недели")
+    end
+
+    local entrance = part(parent, "Вход на трассу недели", Vector3.new(4, 0.3, 4),
+        Vector3.new(-15, 0.2, -8), Colors.lilac, false)
+    sign(entrance, "ЗАБЕГ НЕДЕЛИ", "Одинаковая скорость")
+    return {
+        prompt = prompt(entrance, "Начать забег", "Забег недели"),
+        points = points,
+    }
+end
+
 function World.variantColor(egg)
     return Color3.fromRGB(table.unpack(egg.color))
 end
@@ -331,6 +362,7 @@ function World.build(rules)
 
     return {
         spawn = spawn,
+        weekly = buildWeekly(scene),
         gate = gate,
         windTrail = windTrail,
         stormRelay = stormRelay,

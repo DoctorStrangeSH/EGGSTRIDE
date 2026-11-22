@@ -15,6 +15,12 @@ for _, vault in ipairs(Rules.Vaults) do
     end
 end
 
+local weeklyGroup = "EggstrideWeeklyRunners"
+if not workspace:IsCollisionGroupRegistered(weeklyGroup) then
+    workspace:RegisterCollisionGroup(weeklyGroup)
+end
+workspace:CollisionGroupSetCollidable(weeklyGroup, weeklyGroup, false)
+
 local map = World.build(Rules)
 local startedAt = workspace:GetServerTimeNow()
 local round = Instance.new("Folder")
@@ -93,7 +99,11 @@ end
 local function applySpeed(player, entry)
     local humanoid = characterParts(player)
     if humanoid then
-        humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil) * (entry.windFactor or 1)
+        if entry.weekly then
+            humanoid.WalkSpeed = Rules.speed(Rules.Weekly.tier, entry.weekly.cargo ~= nil)
+        else
+            humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil) * (entry.windFactor or 1)
+        end
     end
 end
 
@@ -178,6 +188,27 @@ local function clearEgg(player, entry)
     applySpeed(player, entry)
 end
 
+local function stopWeekly(player, entry)
+    if not entry.weekly then
+        return
+    end
+    local attempt = entry.weekly
+    attempt.partConnection:Disconnect()
+    for part, group in pairs(attempt.collisionGroups) do
+        if part.Parent then
+            part.CollisionGroup = group
+        end
+    end
+    if attempt.cargo then
+        attempt.cargo:Destroy()
+    end
+    entry.weekly = nil
+    entry.nextWeeklyStart = workspace:GetServerTimeNow() + 1
+    player:SetAttribute("WeeklyEndsAt", nil)
+    player:SetAttribute("WeeklyGoal", nil)
+    applySpeed(player, entry)
+end
+
 local function join(player)
     if closing or player.Parent ~= Players or entries[player] or loading[player] then
         return
@@ -209,6 +240,7 @@ local function join(player)
         onboarding = record.onboarding,
         stormTrailUnlocked = record.stormTrailUnlocked,
         deliveryRecords = record.deliveryRecords,
+        weeklyRecord = record.weeklyRecord,
         tier = record.tier,
         pet = petCatalog[record.equipped],
         delivered = false,
@@ -222,6 +254,7 @@ local function join(player)
     for id, time in pairs(record.deliveryRecords) do
         player:SetAttribute("DeliveryRecord_" .. id, time)
     end
+    player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, Rules.weekId(os.time())))
     entries[player] = entry
     pending -= 1
     advanceOnboarding(player, entry, 1)
@@ -236,6 +269,7 @@ local function join(player)
         if root.Position.X > Rules.GateX then
             character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
         end
+        stopWeekly(player, entry)
         clearEgg(player, entry)
         publish(player, entry)
         if entry.pet then
@@ -244,6 +278,10 @@ local function join(player)
         humanoid.Died:Connect(function()
             if player.Character ~= character or entries[player] ~= entry then
                 return
+            end
+            if entry.weekly then
+                stopWeekly(player, entry)
+                publish(player, entry, "Забег недели прерван. Попробуй ещё раз из лагеря.")
             end
             local lost = entry.egg ~= nil
             clearEgg(player, entry)
@@ -264,7 +302,7 @@ local function withNearbyPlayer(prompt, action)
     prompt.Triggered:Connect(function(player)
         local entry = entries[player]
         local humanoid, root = characterParts(player)
-        if closing or not entry or ProfileStore.expired(entry.session) or not humanoid or humanoid.Health <= 0 or not root then
+        if closing or not entry or entry.weekly or ProfileStore.expired(entry.session) or not humanoid or humanoid.Health <= 0 or not root then
             return
         end
         if (root.Position - prompt.Parent.Position).Magnitude > prompt.MaxActivationDistance then
@@ -324,6 +362,29 @@ local function updateWind(player, entry, humanoid, root, now, open)
     end
 end
 
+local function finishWeekly(player, entry, root, now, week, completed)
+    local attempt = entry.weekly
+    stopWeekly(player, entry)
+    player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
+    root.AssemblyLinearVelocity = Vector3.zero
+    if not completed then
+        publish(player, entry, "Забег недели истёк. Попробуй снова из лагеря.")
+        return
+    end
+
+    local elapsed = now - attempt.startedAt
+    local previous = Rules.weeklyBest(entry.weeklyRecord, week)
+    local best = Rules.improvedDelivery(previous, elapsed, Rules.Weekly.duration)
+    if best then
+        entry.weeklyRecord = { week = week, time = best }
+        player:SetAttribute("WeeklyBest", best)
+    end
+    local message = if best then "Рекорд недели · " else "Забег завершён · "
+    publish(player, entry, message .. Rules.deliveryTimeText(math.round(elapsed * 1000)))
+end
+
+local displayedWeek
+
 local function syncRound()
     local now = workspace:GetServerTimeNow()
     local elapsed = now - startedAt
@@ -364,8 +425,35 @@ local function syncRound()
         windDirection = Rules.windDirection(cycle)
         showWind()
     end
+    local week = Rules.weekId(os.time())
+    local weekChanged = displayedWeek ~= week
+    displayedWeek = week
     for player, entry in pairs(entries) do
         local humanoid, root = characterParts(player)
+        if weekChanged then
+            player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
+        end
+        local attempt = entry.weekly
+        if attempt and root and humanoid and humanoid.Health > 0 then
+            if now >= attempt.endsAt or attempt.week ~= week or ProfileStore.expired(entry.session) then
+                finishWeekly(player, entry, root, now, week, false)
+            else
+                local point = map.weekly.points[Rules.Weekly.order[attempt.step]]
+                if (root.Position - point).Magnitude <= Rules.Weekly.checkpointRadius then
+                    if attempt.step == #Rules.Weekly.order then
+                        finishWeekly(player, entry, root, now, week, true)
+                    else
+                        if attempt.step == Rules.Weekly.eggStep then
+                            attempt.cargo = accessory(root, "EggstrideTrainingEgg", Color3.fromRGB(182, 150, 255),
+                                Vector3.new(1.8, 2.3, 1.8), Vector3.new(0, 0.5, -1.7))
+                            applySpeed(player, entry)
+                        end
+                        attempt.step += 1
+                        player:SetAttribute("WeeklyGoal", Rules.Weekly.labels[attempt.step])
+                    end
+                end
+            end
+        end
         updateWind(player, entry, humanoid, root, now, open)
         if not open and root and humanoid and humanoid.Health > 0 and root.Position.X > Rules.GateX then
             player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
@@ -374,6 +462,41 @@ local function syncRound()
     end
     return open, secondsLeft, now
 end
+
+withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
+    if entry.egg then
+        publish(player, entry, "Сначала доставь яйцо в инкубатор.")
+        return
+    end
+    local now = workspace:GetServerTimeNow()
+    if entry.nextWeeklyStart and now < entry.nextWeeklyStart then
+        return
+    end
+    local character = player.Character
+    local attempt = {
+        startedAt = now, endsAt = now + Rules.Weekly.duration, week = Rules.weekId(os.time()),
+        step = 1, collisionGroups = {},
+    }
+    local function setRunnerCollision(part)
+        if part:IsA("BasePart") and not attempt.collisionGroups[part] then
+            attempt.collisionGroups[part] = part.CollisionGroup
+            part.CollisionGroup = weeklyGroup
+        end
+    end
+    for _, part in ipairs(character:GetDescendants()) do
+        setRunnerCollision(part)
+    end
+    attempt.partConnection = character.DescendantAdded:Connect(setRunnerCollision)
+    entry.weekly = attempt
+    local start = map.weekly.points.Finish + Vector3.new(0, 3.2, 0)
+    player.Character:PivotTo(CFrame.lookAt(start, start + Vector3.new(-1, 0, 0)))
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+    applySpeed(player, entry)
+    player:SetAttribute("WeeklyGoal", Rules.Weekly.labels[1])
+    player:SetAttribute("WeeklyEndsAt", attempt.endsAt)
+    publish(player, entry, "Пройди метки, возьми яйцо и вернись на финиш.")
+end)
 
 for index, display in ipairs(map.vaults) do
     local vault = Rules.Vaults[index]

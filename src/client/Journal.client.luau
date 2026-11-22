@@ -97,9 +97,16 @@ local trialPadding = Instance.new("UIPadding", trial)
 trialPadding.PaddingLeft = UDim.new(0, 10)
 trialPadding.PaddingRight = UDim.new(0, 10)
 
+local weekly = textItem("TextLabel", list, "", 13, palette.text)
+weekly.Name = "WeeklyBest"
+weekly.LayoutOrder = 1
+weekly.Size = UDim2.new(1, -8, 0, 46)
+weekly.TextWrapped = true
+fill(weekly, palette.row, 10)
+
 local rows = {}
 local recordLabels = {}
-local order = 0
+local order = 1
 
 for _, vault in ipairs(Rules.Vaults) do
     order += 1
@@ -152,6 +159,9 @@ end
 
 local function update()
     local equipped = player:GetAttribute("EquippedPetId")
+    local time = player:GetAttribute("WeeklyBest")
+    weekly.Text = if time then "Рекорд недели · " .. Rules.deliveryTimeText(time)
+        else "Забег недели · вход в лагере"
     if player:GetAttribute("StormTrailUnlocked") then
         trial.Text = Rules.StormTrial.name .. "\nОткрыт и применён к спутнику"
     else
@@ -180,6 +190,7 @@ local function update()
 end
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)
+player:GetAttributeChangedSignal("WeeklyBest"):Connect(update)
 player:GetAttributeChangedSignal("StormTrailUnlocked"):Connect(update)
 for vault in pairs(recordLabels) do
     player:GetAttributeChangedSignal("DeliveryRecord_" .. vault.id):Connect(update)

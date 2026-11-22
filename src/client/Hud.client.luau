@@ -95,13 +95,20 @@ local function update()
     elseif step == 3 and (not egg or egg == "") then
         objective.Text = "Открой «Питомцы» и попробуй новый забег"
     end
+    local weeklyGoal = player:GetAttribute("WeeklyGoal")
+    if weeklyGoal then
+        objective.Text = weeklyGoal
+        stats.Text = "Забег недели · скорость " .. Rules.Weekly.tier .. " для всех"
+        pet.Text = "Контрольные точки проходятся по порядку"
+        target = nil
+    end
     guide.Adornee = target
     guide.Enabled = target ~= nil
     local wind = player:GetAttribute("WindEffect")
     notice.Text = wind or player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyGoal" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do
@@ -122,7 +129,13 @@ while true do
         timer.Text = string.format("%s  ·  %02d сек", phase, left)
         timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
         local egg = player:GetAttribute("EggName")
-        updateFeedback(open, left, egg ~= nil and egg ~= "")
+        updateFeedback(open, left, egg ~= nil and egg ~= "", player:GetAttribute("WeeklyEndsAt") ~= nil)
+    end
+    local endsAt = player:GetAttribute("WeeklyEndsAt")
+    if endsAt then
+        local left = math.max(0, math.ceil(endsAt - workspace:GetServerTimeNow()))
+        timer.Text = string.format("ЗАБЕГ НЕДЕЛИ  ·  %02d сек", left)
+        timer.TextColor3 = if left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
     end
     task.wait(0.2)
 end
