@@ -36,6 +36,9 @@ function Profile.read(stored, catalog, rules)
     if type(weekly) == "table" and wholeNumber(weekly.week, 0, 9e15)
         and wholeNumber(weekly.time, 1, rules.Weekly.duration * 1000) then
         record.weeklyRecord = { week = weekly.week, time = weekly.time }
+        if wholeNumber(weekly.rankedTime, weekly.time, rules.Weekly.duration * 1000) then
+            record.weeklyRecord.rankedTime = weekly.rankedTime
+        end
     end
     for id, owned in pairs(stored.owned) do
         if owned == true and catalog[id] then

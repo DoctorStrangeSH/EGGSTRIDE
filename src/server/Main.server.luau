@@ -7,6 +7,7 @@ local Rules = require(Shared.Rules)
 local World = require(script.Parent.World)
 local Profile = require(script.Parent.Profile)
 local ProfileStore = require(script.Parent.ProfileStore)
+local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
 
 local petCatalog = {}
 for _, vault in ipairs(Rules.Vaults) do
@@ -33,6 +34,7 @@ for name, part in pairs(targets) do
     marker.Value = part
     marker.Parent = round
 end
+local weeklyLeaderboard = WeeklyLeaderboard.new(round, Rules)
 round.Parent = Shared
 
 local equipPet = Instance.new("RemoteEvent")
@@ -254,7 +256,11 @@ local function join(player)
     for id, time in pairs(record.deliveryRecords) do
         player:SetAttribute("DeliveryRecord_" .. id, time)
     end
-    player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, Rules.weekId(os.time())))
+    local week = Rules.weekId(os.time())
+    player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
+    if entry.weeklyRecord and entry.weeklyRecord.week == week and entry.weeklyRecord.rankedTime then
+        task.defer(weeklyLeaderboard.submit, weeklyLeaderboard, player.UserId, player.Name, week, entry.weeklyRecord.rankedTime)
+    end
     entries[player] = entry
     pending -= 1
     advanceOnboarding(player, entry, 1)
@@ -375,12 +381,18 @@ local function finishWeekly(player, entry, root, now, week, completed)
     local elapsed = now - attempt.startedAt
     local previous = Rules.weeklyBest(entry.weeklyRecord, week)
     local best = Rules.improvedDelivery(previous, elapsed, Rules.Weekly.duration)
-    if best then
-        entry.weeklyRecord = { week = week, time = best }
-        player:SetAttribute("WeeklyBest", best)
+    local previousRanked = previous and entry.weeklyRecord.rankedTime
+    local rankedBest = attempt.rankable and Rules.improvedDelivery(previousRanked, elapsed, Rules.Weekly.duration)
+    if best or rankedBest then
+        entry.weeklyRecord = { week = week, time = best or previous, rankedTime = rankedBest or previousRanked }
+        player:SetAttribute("WeeklyBest", entry.weeklyRecord.time)
     end
-    local message = if best then "Рекорд недели · " else "Забег завершён · "
-    publish(player, entry, message .. Rules.deliveryTimeText(math.round(elapsed * 1000)))
+    if rankedBest then
+        task.defer(weeklyLeaderboard.submit, weeklyLeaderboard, player.UserId, player.Name, week, rankedBest)
+    end
+    local message = if best then "Личный рекорд недели · " else "Забег завершён · "
+    local qualification = if attempt.rankable then "" else " · вне рейтинга"
+    publish(player, entry, message .. Rules.deliveryTimeText(math.round(elapsed * 1000)) .. qualification)
 end
 
 local displayedWeek
@@ -428,6 +440,7 @@ local function syncRound()
     local week = Rules.weekId(os.time())
     local weekChanged = displayedWeek ~= week
     displayedWeek = week
+    weeklyLeaderboard:refresh(week)
     for player, entry in pairs(entries) do
         local humanoid, root = characterParts(player)
         if weekChanged then
@@ -440,6 +453,11 @@ local function syncRound()
             else
                 local point = map.weekly.points[Rules.Weekly.order[attempt.step]]
                 if (root.Position - point).Magnitude <= Rules.Weekly.checkpointRadius then
+                    local span = (point - attempt.lastPoint).Magnitude
+                    attempt.rankable = attempt.rankable
+                        and Rules.weeklySplitPlausible(span, now - attempt.lastCheckpointAt, attempt.cargo ~= nil)
+                    attempt.lastPoint = point
+                    attempt.lastCheckpointAt = now
                     if attempt.step == #Rules.Weekly.order then
                         finishWeekly(player, entry, root, now, week, true)
                     else
@@ -475,7 +493,8 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     local character = player.Character
     local attempt = {
         startedAt = now, endsAt = now + Rules.Weekly.duration, week = Rules.weekId(os.time()),
-        step = 1, collisionGroups = {},
+        step = 1, collisionGroups = {}, rankable = true,
+        lastPoint = map.weekly.points.Finish, lastCheckpointAt = now,
     }
     local function setRunnerCollision(part)
         if part:IsA("BasePart") and not attempt.collisionGroups[part] then

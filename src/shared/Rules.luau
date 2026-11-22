@@ -104,6 +104,12 @@ function Rules.weekId(timestamp)
     return math.floor((timestamp - 4 * 86400) / (7 * 86400))
 end
 
+function Rules.weeklySplitPlausible(distance, elapsed, carrying)
+    local lowerBound = math.max(0, distance - 2 * Rules.Weekly.checkpointRadius)
+    local pace = Rules.speed(Rules.Weekly.tier, carrying)
+    return elapsed + 0.3 >= lowerBound / (pace * 1.2)
+end
+
 function Rules.weeklyBest(record, week)
     return if record and record.week == week then record.time else nil
 end

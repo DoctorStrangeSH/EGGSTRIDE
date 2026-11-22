@@ -104,9 +104,41 @@ weekly.Size = UDim2.new(1, -8, 0, 46)
 weekly.TextWrapped = true
 fill(weekly, palette.row, 10)
 
+local round = shared:WaitForChild("Round")
+local leaderboardFeed = round:WaitForChild("WeeklyLeaderboard")
+local boardButton = textItem("TextButton", list, "Показать топ недели", 13, palette.panel)
+boardButton.LayoutOrder = 2
+boardButton.Size = UDim2.new(1, -8, 0, 44)
+fill(boardButton, palette.gold, 10)
+local board = textItem("TextLabel", list, "", 13, palette.text)
+board.Name = "WeeklyLeaderboard"
+board.LayoutOrder = 3
+board.Visible = false
+board.Size = UDim2.new(1, -8, 0, 0)
+board.AutomaticSize = Enum.AutomaticSize.Y
+board.TextWrapped = true
+fill(board, palette.row, 10)
+local boardPadding = Instance.new("UIPadding", board)
+boardPadding.PaddingTop = UDim.new(0, 10)
+boardPadding.PaddingBottom = UDim.new(0, 10)
+
+boardButton.Activated:Connect(function()
+    board.Visible = not board.Visible
+    boardButton.Text = if board.Visible then "Скрыть топ недели" else "Показать топ недели"
+end)
+
+local function updateBoard()
+    local titleText = if leaderboardFeed:GetAttribute("SessionOnly") then "Рейтинг тестовой сессии" else "Общий рейтинг недели"
+    board.Text = titleText .. "\n" .. leaderboardFeed.Value
+end
+
+leaderboardFeed:GetPropertyChangedSignal("Value"):Connect(updateBoard)
+leaderboardFeed:GetAttributeChangedSignal("SessionOnly"):Connect(updateBoard)
+updateBoard()
+
 local rows = {}
 local recordLabels = {}
-local order = 1
+local order = 3
 
 for _, vault in ipairs(Rules.Vaults) do
     order += 1
