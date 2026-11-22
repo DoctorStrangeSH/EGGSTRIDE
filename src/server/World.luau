@@ -133,16 +133,34 @@ local function buildWindTrail(parent, fromX, toX, anchorAbility)
     local anchorPrompt = prompt(anchor, "Активировать", anchorAbility.name)
     anchorPrompt.MaxActivationDistance = 7
 
-    return { part = trail, signs = signs, arrows = arrows, anchorPrompt = anchorPrompt }
+    local lever = part(parent, "Рычаг ветра", Vector3.new(1.5, 2.4, 1.5),
+        Vector3.new(fromX - 4, 1.2, lane - 4), Colors.lilac, false)
+    local leverLabel = sign(lever, "РЫЧАГ ВЕТРА", "Помоги игроку с яйцом")
+    local leverPrompt = prompt(lever, "Развернуть ветер", "Рычаг ветра")
+    leverPrompt.MaxActivationDistance = 7
+
+    return {
+        part = trail, signs = signs, arrows = arrows, anchorPrompt = anchorPrompt,
+        leverLabel = leverLabel, leverPrompt = leverPrompt,
+    }
 end
 
-function World.showWind(trail, direction)
+function World.showWind(trail, direction, used, overrideActive)
     local description = "Штиль"
     if direction > 0 then
         description = "Ветер к Янтарному"
     elseif direction < 0 then
         description = "Ветер к Луговому"
     end
+    if overrideActive then
+        description ..= " · рычаг"
+    end
+    local leverState = if overrideActive then "Ветер развёрнут"
+        elseif used then "До следующего раунда"
+        elseif direction == 0 then "Штиль"
+        elseif direction < 0 then "Ветер уже помогает вернуться"
+        else "Помоги игроку с яйцом"
+    trail.leverLabel.Text = "РЫЧАГ ВЕТРА\n" .. leverState
     for _, label in ipairs(trail.signs) do
         label.Text = "ВЕТРОВАЯ ТРОПА\n" .. description
     end

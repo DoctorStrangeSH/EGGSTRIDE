@@ -276,6 +276,12 @@ local roundEggs = {}
 local vineEndsAt = nil
 local windEnabled = workspace:GetAttribute("WindTrailEnabled") ~= false
 local windDirection = 0
+local switchedWind = false
+local windSwitchEndsAt
+
+local function showWind()
+    World.showWind(map.windTrail, windDirection, switchedWind, windSwitchEndsAt ~= nil)
+end
 
 local function updateWind(player, entry, humanoid, root, now, open)
     local factor = 1
@@ -320,8 +326,10 @@ local function syncRound()
     local open, secondsLeft = Rules.clock(elapsed)
     if currentRound ~= cycle then
         currentRound = cycle
+        windSwitchEndsAt = nil
+        switchedWind = false
         windDirection = if windEnabled then Rules.windDirection(cycle) else 0
-        World.showWind(map.windTrail, windDirection)
+        showWind()
         for index, vault in ipairs(Rules.Vaults) do
             local egg = Rules.eggForRoll(vault, random:NextInteger(1, 100))
             roundEggs[index] = egg
@@ -345,6 +353,11 @@ local function syncRound()
     if vineEndsAt and (not open or now >= vineEndsAt) then
         vineEndsAt = nil
         World.showVine(map.vine, false)
+    end
+    if windSwitchEndsAt and (not open or now >= windSwitchEndsAt) then
+        windSwitchEndsAt = nil
+        windDirection = Rules.windDirection(cycle)
+        showWind()
     end
     for player, entry in pairs(entries) do
         local humanoid, root = characterParts(player)
@@ -392,6 +405,46 @@ withNearbyPlayer(map.vinePrompt, function(player, entry)
     vineEndsAt = workspace:GetServerTimeNow() + Rules.Abilities.vine.duration
     World.showVine(map.vine, true)
     publish(player, entry, "Мост из лиан открыт на " .. Rules.Abilities.vine.duration .. " сек.")
+end)
+
+withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
+    if not syncRound() then
+        return
+    end
+    if switchedWind then
+        publish(player, entry, "Рычаг уже использован в этом раунде.")
+        return
+    end
+    if windDirection ~= 1 then
+        publish(player, entry, "На пути домой нет встречного ветра.")
+        return
+    end
+
+    local trail = map.windTrail.part
+    local amberEdge = trail.Position.X + trail.Size.X / 2
+    local anchor = map.windTrail.anchorPrompt.Parent.Position
+    local carrier
+    for other, otherEntry in pairs(entries) do
+        if other ~= player and otherEntry.egg and not ProfileStore.expired(otherEntry.session) then
+            local humanoid, root = characterParts(other)
+            if humanoid and humanoid.Health > 0 and root and root.Position.X >= amberEdge
+                and (root.Position - anchor).Magnitude <= Rules.WindSwitch.partnerRadius then
+                carrier = other
+                break
+            end
+        end
+    end
+    if not Rules.canSwitchWind(windDirection, switchedWind, carrier ~= nil) then
+        publish(player, entry, "Дождись игрока с яйцом у янтарного входа на тропу.")
+        return
+    end
+
+    switchedWind = true
+    windSwitchEndsAt = workspace:GetServerTimeNow() + Rules.WindSwitch.duration
+    windDirection = -1
+    showWind()
+    publish(player, entry, "Ты развернул ветер на " .. Rules.WindSwitch.duration .. " сек.")
+    publish(carrier, entries[carrier], "Ветер развернули. Беги домой по короткой тропе!")
 end)
 
 withNearbyPlayer(map.windTrail.anchorPrompt, function(player, entry)

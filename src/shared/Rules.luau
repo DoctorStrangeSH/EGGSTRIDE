@@ -12,6 +12,7 @@ Rules.Abilities = {
 }
 Rules.WindTailwind = 1.30
 Rules.WindHeadwind = 0.70
+Rules.WindSwitch = { duration = 6, partnerRadius = 14 }
 Rules.StormTrial = { name = "Грозовой след", secondsLeft = 5 }
 Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
 Rules.Vaults = {
@@ -93,6 +94,10 @@ end
 
 function Rules.windDirection(cycle)
     return if cycle % 2 == 0 then 1 else -1
+end
+
+function Rules.canSwitchWind(direction, used, hasCarrier)
+    return direction == 1 and not used and hasCarrier
 end
 
 function Rules.windFactor(direction, speedX, protected)
