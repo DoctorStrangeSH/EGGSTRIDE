@@ -233,7 +233,7 @@ local function buildWeekly(parent)
         local plate = part(parent, marker.id, Vector3.new(7, 0.16, 7), Vector3.new(marker.x, 0.08, marker.z),
             if marker.id == "Egg" then Colors.cream else Colors.azure, false)
         plate.Material = Enum.Material.Neon
-        points[marker.id] = plate.Position
+        points[marker.id] = plate
         sign(plate, marker.title, if marker.id == "Egg" then "Вернись через обе метки" else "Забег недели")
     end
 

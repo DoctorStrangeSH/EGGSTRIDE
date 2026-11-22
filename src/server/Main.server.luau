@@ -28,6 +28,9 @@ local round = Instance.new("Folder")
 round.Name = "Round"
 round:SetAttribute("StartedAt", startedAt)
 local targets = { Gate = map.gate, FirstEgg = map.vaults[1].part, Hatch = map.hatch.Parent }
+for name, point in pairs(map.weekly.points) do
+    targets["Weekly" .. name] = point
+end
 for name, part in pairs(targets) do
     local marker = Instance.new("ObjectValue")
     marker.Name = name
@@ -207,7 +210,7 @@ local function stopWeekly(player, entry)
     entry.weekly = nil
     entry.nextWeeklyStart = workspace:GetServerTimeNow() + 1
     player:SetAttribute("WeeklyEndsAt", nil)
-    player:SetAttribute("WeeklyGoal", nil)
+    player:SetAttribute("WeeklyStep", nil)
     applySpeed(player, entry)
 end
 
@@ -451,7 +454,7 @@ local function syncRound()
             if now >= attempt.endsAt or attempt.week ~= week or ProfileStore.expired(entry.session) then
                 finishWeekly(player, entry, root, now, week, false)
             else
-                local point = map.weekly.points[Rules.Weekly.order[attempt.step]]
+                local point = map.weekly.points[Rules.Weekly.order[attempt.step]].Position
                 if (root.Position - point).Magnitude <= Rules.Weekly.checkpointRadius then
                     local span = (point - attempt.lastPoint).Magnitude
                     attempt.rankable = attempt.rankable
@@ -467,7 +470,7 @@ local function syncRound()
                             applySpeed(player, entry)
                         end
                         attempt.step += 1
-                        player:SetAttribute("WeeklyGoal", Rules.Weekly.labels[attempt.step])
+                        player:SetAttribute("WeeklyStep", attempt.step)
                     end
                 end
             end
@@ -494,7 +497,7 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     local attempt = {
         startedAt = now, endsAt = now + Rules.Weekly.duration, week = Rules.weekId(os.time()),
         step = 1, collisionGroups = {}, rankable = true,
-        lastPoint = map.weekly.points.Finish, lastCheckpointAt = now,
+        lastPoint = map.weekly.points.Finish.Position, lastCheckpointAt = now,
     }
     local function setRunnerCollision(part)
         if part:IsA("BasePart") and not attempt.collisionGroups[part] then
@@ -507,12 +510,12 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     end
     attempt.partConnection = character.DescendantAdded:Connect(setRunnerCollision)
     entry.weekly = attempt
-    local start = map.weekly.points.Finish + Vector3.new(0, 3.2, 0)
+    local start = map.weekly.points.Finish.Position + Vector3.new(0, 3.2, 0)
     player.Character:PivotTo(CFrame.lookAt(start, start + Vector3.new(-1, 0, 0)))
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
     applySpeed(player, entry)
-    player:SetAttribute("WeeklyGoal", Rules.Weekly.labels[1])
+    player:SetAttribute("WeeklyStep", attempt.step)
     player:SetAttribute("WeeklyEndsAt", attempt.endsAt)
     publish(player, entry, "Пройди метки, возьми яйцо и вернись на финиш.")
 end)

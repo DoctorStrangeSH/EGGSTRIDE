@@ -8,6 +8,12 @@ local RunFeedback = require(script.Parent:WaitForChild("RunFeedback"))
 local gateTarget = round:WaitForChild("Gate")
 local eggTarget = round:WaitForChild("FirstEgg")
 local hatchTarget = round:WaitForChild("Hatch")
+local weeklyTargets = {}
+for _, point in ipairs(Rules.Weekly.order) do
+    if not weeklyTargets[point] then
+        weeklyTargets[point] = round:WaitForChild("Weekly" .. point)
+    end
+end
 
 local colors = {
     ink = Color3.fromRGB(37, 34, 65),
@@ -56,13 +62,30 @@ local notice = label("Notice", 94, 32, 12, colors.white)
 
 local runOpen = false
 local guide = Instance.new("Highlight")
-guide.Name = "EggstrideFirstRun"
+guide.Name = "EggstrideObjective"
 guide.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 guide.FillColor = colors.gold
 guide.FillTransparency = 0.82
 guide.OutlineColor = colors.gold
 guide.Enabled = false
 guide.Parent = workspace
+
+local waypoint = Instance.new("BillboardGui")
+waypoint.Name = "WeeklyWaypoint"
+waypoint.AlwaysOnTop = true
+waypoint.Size = UDim2.fromOffset(92, 34)
+waypoint.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+waypoint.Enabled = false
+waypoint.Parent = gui
+
+local waypointText = Instance.new("TextLabel")
+waypointText.Size = UDim2.fromScale(1, 1)
+waypointText.BackgroundColor3 = colors.gold
+waypointText.TextColor3 = colors.ink
+waypointText.Font = Enum.Font.GothamBold
+waypointText.TextSize = 15
+waypointText.Parent = waypoint
+Instance.new("UICorner", waypointText).CornerRadius = UDim.new(0, 8)
 
 local function update()
     local egg = player:GetAttribute("EggName")
@@ -95,23 +118,31 @@ local function update()
     elseif step == 3 and (not egg or egg == "") then
         objective.Text = "Открой «Питомцы» и попробуй новый забег"
     end
-    local weeklyGoal = player:GetAttribute("WeeklyGoal")
-    if weeklyGoal then
-        objective.Text = weeklyGoal
-        stats.Text = "Забег недели · скорость " .. Rules.Weekly.tier .. " для всех"
-        pet.Text = "Контрольные точки проходятся по порядку"
-        target = nil
+    local weeklyStep = player:GetAttribute("WeeklyStep")
+    local weeklyPoint = weeklyTargets[Rules.Weekly.order[weeklyStep]]
+    if weeklyPoint then
+        local progress = string.format("%d / %d", weeklyStep, #Rules.Weekly.order)
+        objective.Text = Rules.Weekly.labels[weeklyStep]
+        stats.Text = "Этап " .. progress .. "  ·  Скорость " .. Rules.Weekly.tier
+        pet.Text = if weeklyStep > Rules.Weekly.eggStep then "Несёшь тренировочное яйцо" else "Путь к тренировочному яйцу"
+        target = weeklyPoint.Value
+        waypointText.Text = progress .. "  ↓"
     end
+    waypoint.Adornee = if weeklyPoint then target else nil
+    waypoint.Enabled = waypoint.Adornee ~= nil
     guide.Adornee = target
     guide.Enabled = target ~= nil
     local wind = player:GetAttribute("WindEffect")
     notice.Text = wind or player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyGoal" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyStep" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do
+    target:GetPropertyChangedSignal("Value"):Connect(update)
+end
+for _, target in pairs(weeklyTargets) do
     target:GetPropertyChangedSignal("Value"):Connect(update)
 end
 update()
