@@ -43,6 +43,7 @@ for _, vault in ipairs(Rules.Vaults) do
         assert(counts[egg] == egg.weight, "Uneven pool: " .. egg.id)
         assert(not shellIds[egg.id], "Species appears in multiple biome pools: " .. egg.id)
         shellIds[egg.id] = true
+        assert(not egg.ability or Rules.Abilities[egg.ability], "Unknown egg ability: " .. egg.id)
         local rare = 0
         for roll = 1, 100 do
             local result = Rules.hatchForRoll(vault, egg, roll)
@@ -63,4 +64,9 @@ assert(Rules.windFactor(1, 20) == 1.30 and Rules.windFactor(1, -20) == 0.70)
 assert(Rules.windFactor(-1, -20) == 1.30 and Rules.windFactor(-1, 20) == 0.70)
 assert(Rules.windFactor(0, 20) == 1 and Rules.windFactor(1, 0.2) == 1)
 assert(math.abs(Rules.speed(2, true) * Rules.windFactor(1, -20) - 10.5) < 1e-9)
+assert(Rules.windFactor(1, -20, true) == 1)
+assert(Rules.windFactor(1, 20, true) == Rules.WindTailwind)
+assert(Rules.windFactor(-1, 20, false) == Rules.WindHeadwind)
+assert(Rules.windFactor(0, -20, true) == 1)
+assert(Rules.speed(2, true) * Rules.windFactor(1, -20, true) == 15)
 print("Eggstride rules: OK")

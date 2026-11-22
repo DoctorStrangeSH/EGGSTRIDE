@@ -66,7 +66,7 @@ guide.Parent = workspace
 
 local function update()
     local egg = player:GetAttribute("EggName")
-    local ability = player:GetAttribute("EggAbility")
+    local ability = Rules.Abilities[player:GetAttribute("EggAbility")]
     local best = player:GetAttribute("EquippedPet")
     local tier = player:GetAttribute("SpeedTier") or 1
     local cost = Rules.UpgradeCosts[tier]
@@ -74,7 +74,7 @@ local function update()
     pet.Text = if egg and egg ~= "" then "Несёшь яйцо: " .. egg
         elseif best and best ~= "" then "Питомец: " .. best
         else "Питомец появится после вылупления"
-    objective.Text = if ability and ability ~= "" then ability .. " · используй у ростка"
+    objective.Text = if ability then ability.name .. " · " .. ability.hint
         elseif egg and egg ~= "" then "Цель: успей к инкубатору"
         elseif player:GetAttribute("Delivered") then "Яйцо спасено · жди следующего забега"
         elseif cost then "Следующая тренировка: " .. cost .. " монет"

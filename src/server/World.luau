@@ -87,7 +87,7 @@ local function runway(parent, fromX, toX, lane)
     end
 end
 
-local function buildWindTrail(parent, fromX, toX)
+local function buildWindTrail(parent, fromX, toX, anchorAbility)
     local lane = 7
     local width = 8
     local trail = part(parent, "Ветровая тропа", Vector3.new(toX - fromX, 1, width),
@@ -127,7 +127,13 @@ local function buildWindTrail(parent, fromX, toX)
         bridge.CFrame = CFrame.lookAt(midpoint, b)
     end
 
-    return { part = trail, signs = signs, arrows = arrows }
+    local anchor = part(parent, "Стойка якоря", Vector3.new(1.5, 2, 1.5), Vector3.new(toX + 3, 1, lane - 3),
+        Colors.amber, false)
+    sign(anchor, anchorAbility.name, string.format(anchorAbility.effect, anchorAbility.duration))
+    local anchorPrompt = prompt(anchor, "Активировать", anchorAbility.name)
+    anchorPrompt.MaxActivationDistance = 7
+
+    return { part = trail, signs = signs, arrows = arrows, anchorPrompt = anchorPrompt }
 end
 
 function World.showWind(trail, direction)
@@ -157,7 +163,9 @@ end
 
 function World.showEgg(display, egg)
     display.part.Color = World.variantColor(egg)
-    local ability = if egg.ability then egg.ability .. " · мост на " .. display.vineDuration .. " сек." else "Без способности"
+    local definition = display.abilities[egg.ability]
+    local ability = if definition then definition.name .. " · " .. string.format(definition.effect, definition.duration)
+        else "Без способности"
     display.label.Text = egg.name
         .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
         .. "\n" .. ability
@@ -225,7 +233,7 @@ function World.build(rules)
     for index, vault in ipairs(rules.Vaults) do
         local accent = World.VaultColors[index]
         if index == 2 then
-            windTrail = buildWindTrail(scene, previousX + 12, vault.x - 12)
+            windTrail = buildWindTrail(scene, previousX + 12, vault.x - 12, rules.Abilities.anchor)
         elseif previousX then
             runway(scene, previousX + 13, vault.x - 13, 0)
         end
@@ -239,7 +247,7 @@ function World.build(rules)
         local egg = part(scene, "Яйцо", Vector3.new(2.4, 3.2, 2.4), Vector3.new(vault.x, 2.6, 0), accent, false)
         egg.Shape = Enum.PartType.Ball
         local eggLabel = sign(egg, vault.name, "Скорость " .. vault.tier)
-        eggLabel.Parent.Size = UDim2.fromScale(14, 6)
+        eggLabel.Parent.Size = UDim2.fromScale(17, 7)
         eggLabel.Parent.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
         vaultDisplays[index] = {
             part = egg,
@@ -247,7 +255,7 @@ function World.build(rules)
             prompt = prompt(egg, "Забрать яйцо", vault.name),
             tier = vault.tier,
             rareChance = rules.RarePetChance,
-            vineDuration = rules.VineDuration,
+            abilities = rules.Abilities,
         }
         previousX = vault.x
     end

@@ -148,6 +148,7 @@ local function clearEgg(player, entry)
     entry.egg = nil
     entry.eggVault = nil
     entry.abilityUsed = false
+    entry.anchorEndsAt = nil
     entry.windFactor = nil
     entry.windPosition = nil
     entry.windSampleAt = nil
@@ -260,6 +261,7 @@ local windDirection = 0
 
 local function updateWind(player, entry, humanoid, root, now, open)
     local factor = 1
+    local protected = entry.anchorEndsAt ~= nil and now < entry.anchorEndsAt
     if open and windDirection ~= 0 and root and humanoid and humanoid.Health > 0 then
         local trail = map.windTrail.part
         local offset = root.Position - trail.Position
@@ -270,7 +272,7 @@ local function updateWind(player, entry, humanoid, root, now, open)
                 if deltaTime < 0.1 then
                     return
                 end
-                factor = Rules.windFactor(windDirection, (root.Position.X - entry.windPosition) / deltaTime)
+                factor = Rules.windFactor(windDirection, (root.Position.X - entry.windPosition) / deltaTime, protected)
             end
             entry.windPosition = root.Position.X
             entry.windSampleAt = now
@@ -283,7 +285,13 @@ local function updateWind(player, entry, humanoid, root, now, open)
     if factor ~= (entry.windFactor or 1) then
         entry.windFactor = factor
         applySpeed(player, entry)
-        player:SetAttribute("WindEffect", if factor > 1 then "Попутный ветер" elseif factor < 1 then "Встречный ветер" else nil)
+    end
+    local effect = if factor > 1 then "Попутный ветер"
+        elseif factor < 1 then "Встречный ветер"
+        elseif protected then "Якорь ветра активен"
+        else nil
+    if player:GetAttribute("WindEffect") ~= effect then
+        player:SetAttribute("WindEffect", effect)
     end
 end
 
@@ -348,14 +356,14 @@ for index, display in ipairs(map.vaults) do
         entry.eggVisual = accessory(root, "EggstrideEgg", World.variantColor(egg),
             Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
         applySpeed(player, entry)
-        publish(player, entry, if egg.ability == "Лиана"
-            then "Лиана может открыть путь домой. Ищи росток у края острова."
+        local ability = Rules.Abilities[egg.ability]
+        publish(player, entry, if ability then string.format(ability.effect, ability.duration)
             else "Возвращайся в лагерь и подойди к инкубатору.")
     end)
 end
 
 withNearbyPlayer(map.vinePrompt, function(player, entry)
-    if not syncRound() or not entry.egg or entry.egg.ability ~= "Лиана" or entry.abilityUsed then
+    if not syncRound() or not entry.egg or entry.egg.ability ~= "vine" or entry.abilityUsed then
         return
     end
     if vineEndsAt then
@@ -363,9 +371,30 @@ withNearbyPlayer(map.vinePrompt, function(player, entry)
         return
     end
     entry.abilityUsed = true
-    vineEndsAt = workspace:GetServerTimeNow() + Rules.VineDuration
+    vineEndsAt = workspace:GetServerTimeNow() + Rules.Abilities.vine.duration
     World.showVine(map.vine, true)
-    publish(player, entry, "Мост из лиан открыт на " .. Rules.VineDuration .. " сек.")
+    publish(player, entry, "Мост из лиан открыт на " .. Rules.Abilities.vine.duration .. " сек.")
+end)
+
+withNearbyPlayer(map.windTrail.anchorPrompt, function(player, entry)
+    if not syncRound() then
+        return
+    end
+    if not entry.egg or entry.egg.ability ~= "anchor" then
+        publish(player, entry, "Нужно яйцо с Янтарного острова.")
+        return
+    end
+    if entry.abilityUsed then
+        publish(player, entry, "Якорь уже использован с этим яйцом.")
+        return
+    end
+    if windDirection ~= 1 then
+        publish(player, entry, "На пути домой нет встречного ветра.")
+        return
+    end
+    entry.abilityUsed = true
+    entry.anchorEndsAt = workspace:GetServerTimeNow() + Rules.Abilities.anchor.duration
+    publish(player, entry, "Якорь активен. Беги по короткой тропе.")
 end)
 
 withNearbyPlayer(map.hatch, function(player, entry, root)

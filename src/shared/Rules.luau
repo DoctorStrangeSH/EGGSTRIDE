@@ -5,7 +5,10 @@ Rules.RunSeconds = 25
 Rules.CarryMultiplier = 0.75
 Rules.StartCoins = 15
 Rules.GateX = 28
-Rules.VineDuration = 6
+Rules.Abilities = {
+    vine = { name = "Лиана", duration = 6, effect = "Мост на %d сек.", hint = "Используй у ростка" },
+    anchor = { name = "Якорь ветра", duration = 6, effect = "Убирает встречный ветер на %d сек.", hint = "Используй у стойки тропы" },
+}
 Rules.WindTailwind = 1.30
 Rules.WindHeadwind = 0.70
 Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
@@ -17,8 +20,8 @@ Rules.Vaults = {
             rare = { id = "dew_moth", name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
         },
         eggs = {
-            { id = "leaf_shell", name = "Листовое яйцо", rarity = "Обычное", weight = 80, ability = "Лиана", color = { 176, 220, 111 } },
-            { id = "dew_shell", name = "Яйцо росы", rarity = "Редкое", weight = 20, ability = "Лиана", color = { 113, 232, 235 } },
+            { id = "leaf_shell", name = "Листовое яйцо", rarity = "Обычное", weight = 80, ability = "vine", color = { 176, 220, 111 } },
+            { id = "dew_shell", name = "Яйцо росы", rarity = "Редкое", weight = 20, ability = "vine", color = { 113, 232, 235 } },
         },
     },
     {
@@ -28,8 +31,8 @@ Rules.Vaults = {
             rare = { id = "prism_fox", name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
         },
         eggs = {
-            { id = "amber_shell", name = "Янтарное яйцо", rarity = "Обычное", weight = 85, color = { 255, 178, 76 } },
-            { id = "prism_shell", name = "Призматическое яйцо", rarity = "Редкое", weight = 15, color = { 255, 113, 165 } },
+            { id = "amber_shell", name = "Янтарное яйцо", rarity = "Обычное", weight = 85, ability = "anchor", color = { 255, 178, 76 } },
+            { id = "prism_shell", name = "Призматическое яйцо", rarity = "Редкое", weight = 15, ability = "anchor", color = { 255, 113, 165 } },
         },
     },
     {
@@ -81,11 +84,14 @@ function Rules.windDirection(cycle)
     return if cycle % 2 == 0 then 1 else -1
 end
 
-function Rules.windFactor(direction, speedX)
+function Rules.windFactor(direction, speedX, protected)
     if direction == 0 or math.abs(speedX) < 1 then
         return 1
     end
-    return if direction * speedX > 0 then Rules.WindTailwind else Rules.WindHeadwind
+    if direction * speedX > 0 then
+        return Rules.WindTailwind
+    end
+    return if protected then 1 else Rules.WindHeadwind
 end
 
 function Rules.onboardingAfterPickup(step)
