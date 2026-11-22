@@ -6,6 +6,8 @@ Rules.CarryMultiplier = 0.75
 Rules.StartCoins = 15
 Rules.GateX = 28
 Rules.VineDuration = 6
+Rules.WindTailwind = 1.30
+Rules.WindHeadwind = 0.70
 Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
 Rules.Vaults = {
     {
@@ -73,6 +75,17 @@ end
 
 function Rules.hatchForRoll(vault, egg, roll)
     return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
+end
+
+function Rules.windDirection(cycle)
+    return if cycle % 2 == 0 then 1 else -1
+end
+
+function Rules.windFactor(direction, speedX)
+    if direction == 0 or math.abs(speedX) < 1 then
+        return 1
+    end
+    return if direction * speedX > 0 then Rules.WindTailwind else Rules.WindHeadwind
 end
 
 function Rules.onboardingAfterPickup(step)

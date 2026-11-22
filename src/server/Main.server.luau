@@ -93,7 +93,7 @@ end
 local function applySpeed(player, entry)
     local humanoid = characterParts(player)
     if humanoid then
-        humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil)
+        humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil) * (entry.windFactor or 1)
     end
 end
 
@@ -148,6 +148,10 @@ local function clearEgg(player, entry)
     entry.egg = nil
     entry.eggVault = nil
     entry.abilityUsed = false
+    entry.windFactor = nil
+    entry.windPosition = nil
+    entry.windSampleAt = nil
+    player:SetAttribute("WindEffect", nil)
     if entry.eggVisual then
         entry.eggVisual:Destroy()
         entry.eggVisual = nil
@@ -251,6 +255,37 @@ local currentRound = -1
 local random = Random.new()
 local roundEggs = {}
 local vineEndsAt = nil
+local windEnabled = workspace:GetAttribute("WindTrailEnabled") ~= false
+local windDirection = 0
+
+local function updateWind(player, entry, humanoid, root, now, open)
+    local factor = 1
+    if open and windDirection ~= 0 and root and humanoid and humanoid.Health > 0 then
+        local trail = map.windTrail.part
+        local offset = root.Position - trail.Position
+        if math.abs(offset.X) <= trail.Size.X / 2 - 2
+            and math.abs(offset.Z) <= trail.Size.Z / 2 and offset.Y >= 0 and offset.Y <= 9 then
+            if entry.windPosition then
+                local deltaTime = now - entry.windSampleAt
+                if deltaTime < 0.1 then
+                    return
+                end
+                factor = Rules.windFactor(windDirection, (root.Position.X - entry.windPosition) / deltaTime)
+            end
+            entry.windPosition = root.Position.X
+            entry.windSampleAt = now
+        else
+            entry.windPosition = nil
+        end
+    else
+        entry.windPosition = nil
+    end
+    if factor ~= (entry.windFactor or 1) then
+        entry.windFactor = factor
+        applySpeed(player, entry)
+        player:SetAttribute("WindEffect", if factor > 1 then "Попутный ветер" elseif factor < 1 then "Встречный ветер" else nil)
+    end
+end
 
 local function syncRound()
     local now = workspace:GetServerTimeNow()
@@ -259,6 +294,8 @@ local function syncRound()
     local open = Rules.clock(elapsed)
     if currentRound ~= cycle then
         currentRound = cycle
+        windDirection = if windEnabled then Rules.windDirection(cycle) else 0
+        World.showWind(map.windTrail, windDirection)
         for index, vault in ipairs(Rules.Vaults) do
             local egg = Rules.eggForRoll(vault, random:NextInteger(1, 100))
             roundEggs[index] = egg
@@ -283,13 +320,12 @@ local function syncRound()
         vineEndsAt = nil
         World.showVine(map.vine, false)
     end
-    if not open then
-        for player in pairs(entries) do
-            local humanoid, root = characterParts(player)
-            if root and humanoid and humanoid.Health > 0 and root.Position.X > Rules.GateX then
-                player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
-                root.AssemblyLinearVelocity = Vector3.zero
-            end
+    for player, entry in pairs(entries) do
+        local humanoid, root = characterParts(player)
+        updateWind(player, entry, humanoid, root, now, open)
+        if not open and root and humanoid and humanoid.Health > 0 and root.Position.X > Rules.GateX then
+            player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
+            root.AssemblyLinearVelocity = Vector3.zero
         end
     end
     return open

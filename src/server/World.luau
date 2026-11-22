@@ -87,6 +87,70 @@ local function runway(parent, fromX, toX, lane)
     end
 end
 
+local function buildWindTrail(parent, fromX, toX)
+    local lane = 7
+    local width = 8
+    local trail = part(parent, "Ветровая тропа", Vector3.new(toX - fromX, 1, width),
+        Vector3.new((fromX + toX) / 2, -0.5, lane), Colors.azure, true)
+
+    local arrows = {}
+    for _, t in ipairs({ 0.15, 0.50, 0.85 }) do
+        local origin = Vector3.new(fromX + (toX - fromX) * t, 0.05, lane)
+        local wings = {}
+        for _, side in ipairs({ -1, 1 }) do
+            local wing = part(parent, "Стрелка ветра", Vector3.new(2.2, 0.1, 0.24), origin, Colors.cream, false)
+            wing.CanQuery = false
+            table.insert(wings, { part = wing, side = side })
+        end
+        table.insert(arrows, { origin = origin, wings = wings })
+    end
+    local signs = {}
+    for _, x in ipairs({ fromX, toX }) do
+        local marker = part(parent, "Флюгер", Vector3.new(0.6, 3, 0.6), Vector3.new(x, 1.5, lane + 3.5), Colors.azure, false)
+        table.insert(signs, sign(marker, "ВЕТРОВАЯ ТРОПА", "Штиль"))
+        local bridgeMarker = part(parent, "Указатель моста", Vector3.new(0.6, 3, 0.6),
+            Vector3.new(x, 1.5, -8), Colors.wood, false)
+        sign(bridgeMarker, "ОБЫЧНЫЙ МОСТ", "Постоянная скорость")
+    end
+
+    local bends = {
+        Vector3.new(fromX, -0.5, -8),
+        Vector3.new(fromX + 12, -0.5, -21),
+        Vector3.new(toX - 12, -0.5, -21),
+        Vector3.new(toX, -0.5, -8),
+    }
+    for index = 1, #bends - 1 do
+        local a, b = bends[index], bends[index + 1]
+        local midpoint = a:Lerp(b, 0.5)
+        local bridge = part(parent, "Пролёт обычного моста", Vector3.new(13, 1, (b - a).Magnitude + 2),
+            midpoint, Colors.wood, true)
+        bridge.CFrame = CFrame.lookAt(midpoint, b)
+    end
+
+    return { part = trail, signs = signs, arrows = arrows }
+end
+
+function World.showWind(trail, direction)
+    local description = "Штиль"
+    if direction > 0 then
+        description = "Ветер к Янтарному"
+    elseif direction < 0 then
+        description = "Ветер к Луговому"
+    end
+    for _, label in ipairs(trail.signs) do
+        label.Text = "ВЕТРОВАЯ ТРОПА\n" .. description
+    end
+    local rotation = if direction < 0 then math.pi else 0
+    for _, arrow in ipairs(trail.arrows) do
+        local base = CFrame.new(arrow.origin) * CFrame.Angles(0, rotation, 0)
+        for _, wing in ipairs(arrow.wings) do
+            wing.part.CFrame = base * CFrame.new(0, 0, wing.side * 0.6)
+                * CFrame.Angles(0, wing.side * math.rad(35), 0)
+            wing.part.Transparency = if direction == 0 then 1 else 0
+        end
+    end
+end
+
 function World.variantColor(egg)
     return Color3.fromRGB(table.unpack(egg.color))
 end
@@ -157,9 +221,12 @@ function World.build(rules)
 
     local vaultDisplays = {}
     local previousX
+    local windTrail
     for index, vault in ipairs(rules.Vaults) do
         local accent = World.VaultColors[index]
-        if previousX then
+        if index == 2 then
+            windTrail = buildWindTrail(scene, previousX + 12, vault.x - 12)
+        elseif previousX then
             runway(scene, previousX + 13, vault.x - 13, 0)
         end
         island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))
@@ -196,6 +263,7 @@ function World.build(rules)
     return {
         spawn = spawn,
         gate = gate,
+        windTrail = windTrail,
         vine = vine,
         vinePrompt = vinePrompt,
         hatch = prompt(hatch, "Вылупить", "Инкубатор"),
