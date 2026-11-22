@@ -4,7 +4,10 @@ Profile.VERSION = 1
 Profile.LEASE_SECONDS = 180
 
 function Profile.new(startCoins)
-    return { version = Profile.VERSION, coins = startCoins, tier = 1, owned = {}, equipped = nil, onboarding = 0 }
+    return {
+        version = Profile.VERSION, coins = startCoins, tier = 1, owned = {},
+        equipped = nil, onboarding = 0, stormTrailUnlocked = false,
+    }
 end
 
 local function wholeNumber(value, low, high)
@@ -20,6 +23,7 @@ function Profile.read(stored, catalog, maxTier)
 
     local record = Profile.new(stored.coins)
     record.tier = stored.tier
+    record.stormTrailUnlocked = stored.stormTrailUnlocked == true
     for id, owned in pairs(stored.owned) do
         if owned == true and catalog[id] then
             record.owned[id] = true
@@ -41,6 +45,7 @@ end
 function Profile.snapshot(entry)
     local record = Profile.new(entry.coins)
     record.tier = entry.tier
+    record.stormTrailUnlocked = entry.stormTrailUnlocked == true
     record.onboarding = entry.onboarding
     for id in pairs(entry.ownedPets) do
         record.owned[id] = true

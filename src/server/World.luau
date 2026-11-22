@@ -157,11 +157,13 @@ function World.showWind(trail, direction)
     end
 end
 
-local function buildStormRelay(parent, originX, landingX, ability)
+local function buildStormRelay(parent, originX, landingX, ability, trial)
     local origin = part(parent, "Грозовой маяк", Vector3.new(2, 4, 2),
         Vector3.new(originX, 2, 8), Colors.lilac, false)
     origin.Material = Enum.Material.Neon
-    sign(origin, ability.name, ability.effect)
+    local label = sign(origin, ability.name, ability.effect .. "\n"
+        .. trial.name .. " · доставь яйцо при " .. trial.secondsLeft .. "+ сек.")
+    label.Parent.Size = UDim2.fromScale(19, 6)
     local launch = prompt(origin, "Перенестись", ability.name)
     launch.MaxActivationDistance = 7
 
@@ -276,7 +278,7 @@ function World.build(rules)
         elseif previousX then
             runway(scene, previousX + 13, vault.x - 13, 0)
             if index == 3 then
-                stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8, rules.Abilities.relay)
+                stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8, rules.Abilities.relay, rules.StormTrial)
             end
         end
         island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))

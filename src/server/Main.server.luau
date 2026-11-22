@@ -99,6 +99,7 @@ end
 
 local function publish(player, entry, message)
     player:SetAttribute("OnboardingStep", entry.onboarding)
+    player:SetAttribute("StormTrailUnlocked", entry.stormTrailUnlocked)
     player:SetAttribute("Coins", entry.coins)
     player:SetAttribute("SpeedTier", entry.tier)
     player:SetAttribute("EquippedPetId", entry.pet and entry.pet.id or "")
@@ -131,7 +132,7 @@ local function accessory(root, name, color, size, offset)
     return visual
 end
 
-local function showPet(root, pet)
+local function showPet(root, pet, stormTrailUnlocked)
     local previous = root:FindFirstChild("EggstridePet")
     if previous then
         previous:Destroy()
@@ -141,6 +142,22 @@ local function showPet(root, pet)
     for _, x in ipairs({ -0.43, 0.43 }) do
         accessory(body, "Eye", Color3.fromRGB(46, 40, 61), Vector3.new(0.21, 0.27, 0.21), Vector3.new(x, 0.1, -0.72))
         accessory(body, "Ear", accent, Vector3.new(0.44, 0.78, 0.47), Vector3.new(x * 1.55, 0.67, 0.05))
+    end
+    if stormTrailUnlocked then
+        local top = Instance.new("Attachment")
+        top.Position = Vector3.new(0, 0.35, 0.5)
+        top.Parent = body
+        local bottom = Instance.new("Attachment")
+        bottom.Position = Vector3.new(0, -0.35, 0.5)
+        bottom.Parent = body
+        local trail = Instance.new("Trail")
+        trail.Attachment0 = top
+        trail.Attachment1 = bottom
+        trail.Color = ColorSequence.new(Color3.fromRGB(182, 150, 255), Color3.fromRGB(123, 208, 250))
+        trail.Transparency = NumberSequence.new(0.15, 1)
+        trail.FaceCamera = true
+        trail.Lifetime = 0.35
+        trail.Parent = body
     end
 end
 
@@ -189,6 +206,7 @@ local function join(player)
         session = session,
         coins = record.coins,
         onboarding = record.onboarding,
+        stormTrailUnlocked = record.stormTrailUnlocked,
         tier = record.tier,
         pet = petCatalog[record.equipped],
         delivered = false,
@@ -216,7 +234,7 @@ local function join(player)
         clearEgg(player, entry)
         publish(player, entry)
         if entry.pet then
-            showPet(root, entry.pet)
+            showPet(root, entry.pet, entry.stormTrailUnlocked)
         end
         humanoid.Died:Connect(function()
             if player.Character ~= character or entries[player] ~= entry then
@@ -299,7 +317,7 @@ local function syncRound()
     local now = workspace:GetServerTimeNow()
     local elapsed = now - startedAt
     local cycle = math.floor(elapsed / (Rules.PrepareSeconds + Rules.RunSeconds))
-    local open = Rules.clock(elapsed)
+    local open, secondsLeft = Rules.clock(elapsed)
     if currentRound ~= cycle then
         currentRound = cycle
         windDirection = if windEnabled then Rules.windDirection(cycle) else 0
@@ -336,7 +354,7 @@ local function syncRound()
             root.AssemblyLinearVelocity = Vector3.zero
         end
     end
-    return open
+    return open, secondsLeft
 end
 
 for index, display in ipairs(map.vaults) do
@@ -418,11 +436,16 @@ withNearbyPlayer(map.stormRelay.prompt, function(player, entry, root)
 end)
 
 withNearbyPlayer(map.hatch, function(player, entry, root)
-    if not syncRound() or not entry.egg then
+    local open, secondsLeft = syncRound()
+    if not open or not entry.egg then
         return
     end
     local egg = entry.egg
     local vault = entry.eggVault
+    local unlockedTrail = not entry.stormTrailUnlocked and Rules.stormTrialComplete(egg, entry.abilityUsed, secondsLeft)
+    if unlockedTrail then
+        entry.stormTrailUnlocked = true
+    end
     clearEgg(player, entry)
     entry.delivered = true
     entry.coins += vault.coins
@@ -432,14 +455,15 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
         entry.ownedPets[pet.id] = pet
         player:SetAttribute("OwnsPet_" .. pet.id, true)
     end
-    if not entry.pet then
-        entry.pet = pet
-        showPet(root, pet)
+    if not entry.pet or unlockedTrail then
+        entry.pet = entry.pet or pet
+        showPet(root, entry.pet, entry.stormTrailUnlocked)
     end
     advanceOnboarding(player, entry, 3)
     local result = if isNew then "Новый в журнале: " else "Вылупился "
     publish(player, entry, result .. pet.name .. " · " .. pet.rarity .. " · +" .. vault.coins .. " монет.")
-    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins, isNew)
+    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins, isNew,
+        if unlockedTrail then Rules.StormTrial.name else nil)
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)
@@ -474,7 +498,7 @@ equipPet.OnServerEvent:Connect(function(player, petId)
     entry.pet = pet
     local humanoid, root = characterParts(player)
     if humanoid and humanoid.Health > 0 and root then
-        showPet(root, pet)
+        showPet(root, pet, entry.stormTrailUnlocked)
     end
     publish(player, entry, "Спутник выбран: " .. pet.name .. ".")
 end)

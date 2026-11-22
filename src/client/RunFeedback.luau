@@ -72,10 +72,12 @@ function RunFeedback.connect(gui, event)
         end)
     end
 
-    event.OnClientEvent:Connect(function(kind, petName, rarity, coins, isNew)
+    event.OnClientEvent:Connect(function(kind, petName, rarity, coins, isNew, rewardName)
         if kind == "Hatch" then
             local accent = if rarity == "Редкий" then Color3.fromRGB(255, 209, 117) else Color3.fromRGB(163, 255, 201)
-            local collection = if isNew then " · Новый в журнале" else ""
+            local collection = if rewardName then "\nНаграда · " .. rewardName
+                elseif isNew then " · Новый в журнале"
+                else ""
             show(petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
             hatchSound.PlaybackSpeed = if rarity == "Редкий" then 1.28 else 1.10
             hatchSound:Play()

@@ -87,6 +87,16 @@ local layout = Instance.new("UIListLayout", list)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, 6)
 
+local trial = textItem("TextLabel", list, "", 13, palette.gold)
+trial.Name = "StormTrial"
+trial.LayoutOrder = 0
+trial.Size = UDim2.new(1, -8, 0, 62)
+trial.TextWrapped = true
+fill(trial, palette.row, 10)
+local trialPadding = Instance.new("UIPadding", trial)
+trialPadding.PaddingLeft = UDim.new(0, 10)
+trialPadding.PaddingRight = UDim.new(0, 10)
+
 local rows = {}
 
 for _, vault in ipairs(Rules.Vaults) do
@@ -132,6 +142,12 @@ end
 
 local function update()
     local equipped = player:GetAttribute("EquippedPetId")
+    if player:GetAttribute("StormTrailUnlocked") then
+        trial.Text = Rules.StormTrial.name .. "\nОткрыт и применён к спутнику"
+    else
+        trial.Text = string.format("%s\nДоставь грозовое яйцо через маяк, пока на таймере %d+ сек.",
+            Rules.StormTrial.name, Rules.StormTrial.secondsLeft)
+    end
     local count = 0
     for _, row in ipairs(rows) do
         local owned = player:GetAttribute("OwnsPet_" .. row.id) == true
@@ -150,6 +166,7 @@ local function update()
 end
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)
+player:GetAttributeChangedSignal("StormTrailUnlocked"):Connect(update)
 for _, row in ipairs(rows) do
     player:GetAttributeChangedSignal("OwnsPet_" .. row.id):Connect(update)
 end

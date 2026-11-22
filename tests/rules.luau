@@ -74,4 +74,12 @@ for _, egg in ipairs(Rules.Vaults[3].eggs) do
 end
 assert(Rules.abilityEffect(Rules.Abilities.relay) == "Переносит на Янтарный остров")
 assert(string.find(Rules.abilityEffect(Rules.Abilities.vine), tostring(Rules.Abilities.vine.duration), 1, true))
+local thunder = Rules.Vaults[3].eggs
+local required = Rules.StormTrial.secondsLeft
+assert(Rules.stormTrialComplete(thunder[1], true, required))
+assert(Rules.stormTrialComplete(thunder[2], true, required))
+assert(not Rules.stormTrialComplete(thunder[1], true, required - 1))
+assert(not Rules.stormTrialComplete(thunder[1], false, required + 1))
+assert(not Rules.stormTrialComplete(Rules.Vaults[1].eggs[1], true, required + 1))
+assert(not Rules.stormTrialComplete(nil, true, required + 1))
 print("Eggstride rules: OK")

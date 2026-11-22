@@ -12,6 +12,7 @@ Rules.Abilities = {
 }
 Rules.WindTailwind = 1.30
 Rules.WindHeadwind = 0.70
+Rules.StormTrial = { name = "Грозовой след", secondsLeft = 5 }
 Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
 Rules.Vaults = {
     {
@@ -79,6 +80,11 @@ end
 
 function Rules.hatchForRoll(vault, egg, roll)
     return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
+end
+
+function Rules.stormTrialComplete(egg, usedAbility, secondsLeft)
+    return egg ~= nil and egg.ability == "relay" and usedAbility == true
+        and secondsLeft >= Rules.StormTrial.secondsLeft
 end
 
 function Rules.abilityEffect(ability)
