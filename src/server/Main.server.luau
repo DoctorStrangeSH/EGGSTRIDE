@@ -3,6 +3,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
 local World = require(script.Parent.World)
+local Profile = require(script.Parent.Profile)
+local ProfileStore = require(script.Parent.ProfileStore)
+
+local petCatalog = {}
+for _, vault in ipairs(Rules.Vaults) do
+    for _, pet in pairs(vault.pets) do
+        petCatalog[pet.id] = pet
+    end
+end
 
 local map = World.build(Rules)
 local startedAt = workspace:GetServerTimeNow()
@@ -16,6 +25,27 @@ equipPet.Name = "EquipPet"
 equipPet.Parent = Shared
 
 local entries = {}
+local loading = {}
+local closing = false
+local pending = 0
+
+local function leave(player)
+    local entry = entries[player]
+    if not entry then
+        local load = loading[player]
+        if load then
+            load.cancelled = true
+        end
+        return
+    end
+    entries[player] = nil
+    pending += 1
+    local ok, reason = ProfileStore.save(entry.session, Profile.snapshot(entry), true)
+    pending -= 1
+    if not ok then
+        warn("EGGSTRIDE: final save failed", player.UserId, reason)
+    end
+end
 
 local function characterParts(player)
     local character = player.Character
@@ -90,13 +120,46 @@ local function clearEgg(player, entry)
 end
 
 local function join(player)
-    if entries[player] then
+    if closing or player.Parent ~= Players or entries[player] or loading[player] then
         return
     end
-    local entry = { coins = Rules.StartCoins, tier = 1, delivered = false, ownedPets = {}, nextEquipAt = 0 }
-    entries[player] = entry
-    publish(player, entry, "Заработай скорость в лагере или сразу попробуй ближайший остров.")
+    local load = { cancelled = false }
+    loading[player] = load
+    pending += 1
     player.RespawnLocation = map.spawn
+    player:SetAttribute("Notice", "Загружаем прогресс…")
+    local function canContinue()
+        return not closing and not load.cancelled and player.Parent == Players
+    end
+    local session, record, reason = ProfileStore.open(player, petCatalog, Rules, canContinue)
+    loading[player] = nil
+    if not session or not canContinue() then
+        if session then
+            ProfileStore.save(session, record, true)
+        elseif canContinue() then
+            warn("EGGSTRIDE: profile load failed", player.UserId, reason)
+            player:Kick("Не удалось загрузить прогресс. Попробуй зайти чуть позже.")
+        end
+        pending -= 1
+        return
+    end
+
+    local entry = {
+        session = session,
+        coins = record.coins,
+        tier = record.tier,
+        pet = petCatalog[record.equipped],
+        delivered = false,
+        ownedPets = {},
+        nextEquipAt = 0,
+    }
+    for id in pairs(record.owned) do
+        entry.ownedPets[id] = petCatalog[id]
+        player:SetAttribute("OwnsPet_" .. id, true)
+    end
+    entries[player] = entry
+    pending -= 1
+    publish(player, entry, "Заработай скорость в лагере или сразу попробуй ближайший остров.")
 
     local function spawn(character)
         local humanoid = character:WaitForChild("Humanoid", 10)
@@ -132,7 +195,7 @@ local function withNearbyPlayer(prompt, action)
     prompt.Triggered:Connect(function(player)
         local entry = entries[player]
         local humanoid, root = characterParts(player)
-        if not entry or not humanoid or humanoid.Health <= 0 or not root then
+        if closing or not entry or ProfileStore.expired(entry.session) or not humanoid or humanoid.Health <= 0 or not root then
             return
         end
         if (root.Position - prompt.Parent.Position).Magnitude > prompt.MaxActivationDistance then
@@ -263,7 +326,7 @@ end)
 
 equipPet.OnServerEvent:Connect(function(player, petId)
     local entry = entries[player]
-    if not entry or typeof(petId) ~= "string" or #petId > 32 then
+    if closing or not entry or ProfileStore.expired(entry.session) or typeof(petId) ~= "string" or #petId > 32 then
         return
     end
     local now = os.clock()
@@ -287,12 +350,46 @@ end)
 syncRound()
 
 Players.PlayerAdded:Connect(join)
-Players.PlayerRemoving:Connect(function(player)
-    entries[player] = nil
-end)
+Players.PlayerRemoving:Connect(leave)
 for _, player in ipairs(Players:GetPlayers()) do
-    join(player)
+    task.spawn(join, player)
 end
+
+game:BindToClose(function()
+    closing = true
+    for player in pairs(entries) do
+        task.defer(leave, player)
+    end
+    task.wait()
+    local deadline = os.clock() + 25
+    while pending > 0 and os.clock() < deadline do
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while not closing do
+        task.wait(45)
+        if closing then
+            break
+        end
+        for player, entry in pairs(entries) do
+            task.defer(function()
+                if entries[player] ~= entry then
+                    return
+                end
+                local ok, reason = ProfileStore.save(entry.session, Profile.snapshot(entry), false)
+                if entries[player] ~= entry or ok then
+                    return
+                end
+                warn("EGGSTRIDE: autosave failed", player.UserId, reason)
+                if reason == "lost" or ProfileStore.expired(entry.session) then
+                    player:Kick("Сохранение больше недоступно. Перезайди, чтобы продолжить.")
+                end
+            end)
+        end
+    end
+end)
 
 while true do
     syncRound()

@@ -1,0 +1,50 @@
+local Profile = require("../src/server/Profile")
+local Rules = require("../src/shared/Rules")
+
+local catalog = {}
+for _, vault in ipairs(Rules.Vaults) do
+    for _, pet in pairs(vault.pets) do
+        catalog[pet.id] = pet
+    end
+end
+
+local defaults = Profile.new(Rules.StartCoins)
+assert(defaults.tier == 1 and defaults.coins == Rules.StartCoins and not next(defaults.owned))
+
+local opened = Profile.acquire(nil, "server_a", 100, catalog, #Rules.Speeds, Rules.StartCoins)
+assert(opened.lease.owner == "server_a" and opened.lease.expiresAt == 280)
+local blocked, reason = Profile.acquire(opened, "server_b", 101, catalog, #Rules.Speeds, Rules.StartCoins)
+assert(blocked == nil and reason == "locked")
+assert(Profile.acquire(opened, "server_a", 101, catalog, #Rules.Speeds, Rules.StartCoins).lease.expiresAt == 281)
+
+local pet = catalog.dew_moth
+local entry = {
+    coins = 77, tier = 2, ownedPets = { [pet.id] = pet }, pet = pet,
+    delivered = true, egg = Rules.Vaults[1].eggs[1],
+}
+local snapshot = Profile.snapshot(entry)
+assert(snapshot.coins == 77 and snapshot.tier == 2 and snapshot.equipped == pet.id)
+assert(snapshot.owned[pet.id] == true and snapshot.egg == nil and snapshot.delivered == nil)
+assert(Profile.write(opened, snapshot, "server_b", 101, false) == nil)
+
+local interim = Profile.write(opened, snapshot, "server_a", 150, false)
+assert(interim.lease.expiresAt == 330 and interim.coins == 77)
+assert(Profile.write(interim, snapshot, "server_a", 330, false) == nil)
+local takeover = Profile.acquire(interim, "server_b", 330, catalog, #Rules.Speeds, Rules.StartCoins)
+assert(takeover.lease.owner == "server_b" and takeover.owned[pet.id] and takeover.equipped == pet.id)
+assert(Profile.write(takeover, defaults, "server_a", 331, true) == nil)
+local released = Profile.write(takeover, snapshot, "server_b", 331, true)
+assert(released.lease == nil and released.owned[pet.id])
+local rejoined = Profile.acquire(released, "server_c", 331, catalog, #Rules.Speeds, Rules.StartCoins)
+assert(rejoined.equipped == pet.id and rejoined.coins == 77 and rejoined.tier == 2)
+
+snapshot.equipped = "unknown_pet"
+snapshot.owned.unknown_pet = true
+local normalized = Profile.read(snapshot, catalog, #Rules.Speeds)
+assert(normalized.equipped == pet.id and normalized.owned.unknown_pet == nil)
+snapshot.version = Profile.VERSION + 1
+local invalid, invalidReason = Profile.acquire(snapshot, "server_c", 400, catalog, #Rules.Speeds, Rules.StartCoins)
+assert(invalid == nil and invalidReason == "invalid")
+assert(Profile.acquire({version = 1, coins = -1, tier = 1, owned = {}}, "server_c", 400, catalog, #Rules.Speeds, Rules.StartCoins) == nil)
+
+print("Eggstride profiles: OK")
