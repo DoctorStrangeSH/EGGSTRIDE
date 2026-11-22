@@ -22,6 +22,6 @@
 - `src/client` — интерфейс игрока.
 - `assets` — выбранные модели Creator Store.
 - `tests` — проверки правил на Luau.
-- [ТЗ](docs/PROJECT_SPEC.md), [план разработки](ROADMAP.md), [проверка в Studio](docs/TESTING.md), [источники моделей](docs/ASSETS.md).
+- [ТЗ](docs/PROJECT_SPEC.md), [план разработки](ROADMAP.md), [анализ механик и плейтест](docs/GAME_DESIGN_REVIEW.md), [проверка в Studio](docs/TESTING.md), [источники моделей](docs/ASSETS.md).
 
 Для разработки используйте `rojo serve` или соберите place командой `rojo build -o EGGSTRIDE-Playtest.rbxl`. Для тестов правил запустите `luau tests/rules.luau`.
