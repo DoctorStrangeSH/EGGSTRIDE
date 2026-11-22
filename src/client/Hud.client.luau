@@ -4,6 +4,7 @@ local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
 local round = shared:WaitForChild("Round")
+local RunFeedback = require(script.Parent:WaitForChild("RunFeedback"))
 local gateTarget = round:WaitForChild("Gate")
 local eggTarget = round:WaitForChild("FirstEgg")
 local hatchTarget = round:WaitForChild("Hatch")
@@ -20,6 +21,7 @@ gui.Name = "EggstrideHud"
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 gui.Parent = player:WaitForChild("PlayerGui")
+local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"))
 
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(0.5, 0)
@@ -114,8 +116,12 @@ while true do
             runOpen = open
             update()
         end
-        timer.Text = string.format("%s  ·  %02d сек", if open then "ЗАБЕГ" else "ПОДГОТОВКА", left)
-        timer.TextColor3 = if open and left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
+        local closing = open and left <= 5
+        local phase = if closing then "ВОРОТА ЗАКРЫВАЮТСЯ" elseif open then "ЗАБЕГ" else "ПОДГОТОВКА"
+        timer.Text = string.format("%s  ·  %02d сек", phase, left)
+        timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
+        local egg = player:GetAttribute("EggName")
+        updateFeedback(open, left, egg ~= nil and egg ~= "")
     end
     task.wait(0.2)
 end

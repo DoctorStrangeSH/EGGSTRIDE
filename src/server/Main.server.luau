@@ -33,6 +33,10 @@ local equipPet = Instance.new("RemoteEvent")
 equipPet.Name = "EquipPet"
 equipPet.Parent = Shared
 
+local runFeedback = Instance.new("RemoteEvent")
+runFeedback.Name = "RunFeedback"
+runFeedback.Parent = Shared
+
 local entries = {}
 local loading = {}
 local closing = false
@@ -215,6 +219,9 @@ local function join(player)
             end
             local lost = entry.egg ~= nil
             clearEgg(player, entry)
+            if lost then
+                runFeedback:FireClient(player, "Fall")
+            end
             publish(player, entry, if lost then "Яйцо потеряно. Следующий забег начнётся в лагере." else nil)
         end)
     end
@@ -261,6 +268,9 @@ local function syncRound()
             entry.delivered = false
             local lost = entry.egg ~= nil
             clearEgg(player, entry)
+            if lost then
+                runFeedback:FireClient(player, "Timeout")
+            end
             publish(player, entry, if lost then "Время вышло. Вынеси яйцо в следующем забеге." else nil)
         end
     end
@@ -344,6 +354,7 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
     advanceOnboarding(player, entry, 3)
     local result = if isNew then "Новый в журнале: " else "Вылупился "
     publish(player, entry, result .. pet.name .. " · " .. pet.rarity .. " · +" .. vault.coins .. " монет.")
+    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins, isNew)
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)
