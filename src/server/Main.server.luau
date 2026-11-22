@@ -307,7 +307,7 @@ local function syncRound()
         for index, vault in ipairs(Rules.Vaults) do
             local egg = Rules.eggForRoll(vault, random:NextInteger(1, 100))
             roundEggs[index] = egg
-            World.showEgg(map.vaults[index], egg)
+            World.showEgg(map.vaults[index], egg, Rules)
         end
         for player, entry in pairs(entries) do
             entry.delivered = false
@@ -357,7 +357,7 @@ for index, display in ipairs(map.vaults) do
             Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
         applySpeed(player, entry)
         local ability = Rules.Abilities[egg.ability]
-        publish(player, entry, if ability then string.format(ability.effect, ability.duration)
+        publish(player, entry, if ability then Rules.abilityEffect(ability)
             else "Возвращайся в лагерь и подойди к инкубатору.")
     end)
 end
@@ -395,6 +395,26 @@ withNearbyPlayer(map.windTrail.anchorPrompt, function(player, entry)
     entry.abilityUsed = true
     entry.anchorEndsAt = workspace:GetServerTimeNow() + Rules.Abilities.anchor.duration
     publish(player, entry, "Якорь активен. Беги по короткой тропе.")
+end)
+
+withNearbyPlayer(map.stormRelay.prompt, function(player, entry, root)
+    if not syncRound() then
+        return
+    end
+    if not entry.egg or entry.egg.ability ~= "relay" then
+        publish(player, entry, "Нужно яйцо с Грозового острова.")
+        return
+    end
+    if entry.abilityUsed then
+        publish(player, entry, "Разряд уже использован с этим яйцом.")
+        return
+    end
+    entry.abilityUsed = true
+    player.Character:PivotTo(map.stormRelay.destination)
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+    World.flashRelay(map.stormRelay)
+    publish(player, entry, "Ты на Янтарном острове. Донеси яйцо в лагерь.")
 end)
 
 withNearbyPlayer(map.hatch, function(player, entry, root)

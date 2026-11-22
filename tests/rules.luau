@@ -69,4 +69,9 @@ assert(Rules.windFactor(1, 20, true) == Rules.WindTailwind)
 assert(Rules.windFactor(-1, 20, false) == Rules.WindHeadwind)
 assert(Rules.windFactor(0, -20, true) == 1)
 assert(Rules.speed(2, true) * Rules.windFactor(1, -20, true) == 15)
+for _, egg in ipairs(Rules.Vaults[3].eggs) do
+    assert(egg.ability == "relay")
+end
+assert(Rules.abilityEffect(Rules.Abilities.relay) == "Переносит на Янтарный остров")
+assert(string.find(Rules.abilityEffect(Rules.Abilities.vine), tostring(Rules.Abilities.vine.duration), 1, true))
 print("Eggstride rules: OK")

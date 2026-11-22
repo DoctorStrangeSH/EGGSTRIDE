@@ -157,14 +157,52 @@ function World.showWind(trail, direction)
     end
 end
 
+local function buildStormRelay(parent, originX, landingX, ability)
+    local origin = part(parent, "Грозовой маяк", Vector3.new(2, 4, 2),
+        Vector3.new(originX, 2, 8), Colors.lilac, false)
+    origin.Material = Enum.Material.Neon
+    sign(origin, ability.name, ability.effect)
+    local launch = prompt(origin, "Перенестись", ability.name)
+    launch.MaxActivationDistance = 7
+
+    local landing = part(parent, "Приёмный маяк", Vector3.new(7, 0.3, 7),
+        Vector3.new(landingX, 0.16, 8), Colors.lilac, false)
+    landing.Material = Enum.Material.Neon
+    sign(landing, "ПРИЁМНЫЙ МАЯК", "С Грозового острова")
+    local destination = landing.Position + Vector3.new(0, 4, 0)
+    local pulse = part(parent, "Грозовой импульс", Vector3.new(0.55, 0.55, (origin.Position - destination).Magnitude),
+        (origin.Position + destination) * 0.5, Colors.lilac, false)
+    pulse.CFrame = CFrame.lookAt(pulse.Position, destination)
+    pulse.Material = Enum.Material.Neon
+    pulse.CanQuery = false
+    pulse.Transparency = 1
+    return {
+        prompt = launch,
+        destination = CFrame.lookAt(destination, destination + Vector3.new(-1, 0, 0)),
+        pulse = pulse,
+        flashes = 0,
+    }
+end
+
+function World.flashRelay(relay)
+    relay.flashes += 1
+    local flash = relay.flashes
+    relay.pulse.Transparency = 0.16
+    task.delay(0.35, function()
+        if flash == relay.flashes then
+            relay.pulse.Transparency = 1
+        end
+    end)
+end
+
 function World.variantColor(egg)
     return Color3.fromRGB(table.unpack(egg.color))
 end
 
-function World.showEgg(display, egg)
+function World.showEgg(display, egg, rules)
     display.part.Color = World.variantColor(egg)
-    local definition = display.abilities[egg.ability]
-    local ability = if definition then definition.name .. " · " .. string.format(definition.effect, definition.duration)
+    local definition = rules.Abilities[egg.ability]
+    local ability = if definition then definition.name .. " · " .. rules.abilityEffect(definition)
         else "Без способности"
     display.label.Text = egg.name
         .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
@@ -230,12 +268,16 @@ function World.build(rules)
     local vaultDisplays = {}
     local previousX
     local windTrail
+    local stormRelay
     for index, vault in ipairs(rules.Vaults) do
         local accent = World.VaultColors[index]
         if index == 2 then
             windTrail = buildWindTrail(scene, previousX + 12, vault.x - 12, rules.Abilities.anchor)
         elseif previousX then
             runway(scene, previousX + 13, vault.x - 13, 0)
+            if index == 3 then
+                stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8, rules.Abilities.relay)
+            end
         end
         island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))
         local treeName = if index == 1 then "RoundTree" else "Pine"
@@ -255,7 +297,6 @@ function World.build(rules)
             prompt = prompt(egg, "Забрать яйцо", vault.name),
             tier = vault.tier,
             rareChance = rules.RarePetChance,
-            abilities = rules.Abilities,
         }
         previousX = vault.x
     end
@@ -272,6 +313,7 @@ function World.build(rules)
         spawn = spawn,
         gate = gate,
         windTrail = windTrail,
+        stormRelay = stormRelay,
         vine = vine,
         vinePrompt = vinePrompt,
         hatch = prompt(hatch, "Вылупить", "Инкубатор"),

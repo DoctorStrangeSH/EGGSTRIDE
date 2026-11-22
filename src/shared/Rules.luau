@@ -7,6 +7,7 @@ Rules.StartCoins = 15
 Rules.GateX = 28
 Rules.Abilities = {
     vine = { name = "Лиана", duration = 6, effect = "Мост на %d сек.", hint = "Используй у ростка" },
+    relay = { name = "Грозовой разряд", effect = "Переносит на Янтарный остров", hint = "Используй у маяка" },
     anchor = { name = "Якорь ветра", duration = 6, effect = "Убирает встречный ветер на %d сек.", hint = "Используй у стойки тропы" },
 }
 Rules.WindTailwind = 1.30
@@ -42,8 +43,8 @@ Rules.Vaults = {
             rare = { id = "lightning_kite", name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
         },
         eggs = {
-            { id = "thunder_shell", name = "Грозовое яйцо", rarity = "Обычное", weight = 90, color = { 182, 150, 255 } },
-            { id = "lightning_shell", name = "Яйцо молнии", rarity = "Редкое", weight = 10, color = { 255, 237, 108 } },
+            { id = "thunder_shell", name = "Грозовое яйцо", rarity = "Обычное", weight = 90, ability = "relay", color = { 182, 150, 255 } },
+            { id = "lightning_shell", name = "Яйцо молнии", rarity = "Редкое", weight = 10, ability = "relay", color = { 255, 237, 108 } },
         },
     },
 }
@@ -78,6 +79,10 @@ end
 
 function Rules.hatchForRoll(vault, egg, roll)
     return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
+end
+
+function Rules.abilityEffect(ability)
+    return if ability.duration then string.format(ability.effect, ability.duration) else ability.effect
 end
 
 function Rules.windDirection(cycle)
