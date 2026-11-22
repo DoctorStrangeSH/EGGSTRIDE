@@ -4,6 +4,9 @@ local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
 local round = shared:WaitForChild("Round")
+local gateTarget = round:WaitForChild("Gate")
+local eggTarget = round:WaitForChild("FirstEgg")
+local hatchTarget = round:WaitForChild("Hatch")
 
 local colors = {
     ink = Color3.fromRGB(37, 34, 65),
@@ -49,6 +52,16 @@ local pet = label("Pet", 53, 19, 13, colors.mint)
 local objective = label("Objective", 74, 22, 13, colors.gold)
 local notice = label("Notice", 94, 32, 12, colors.white)
 
+local runOpen = false
+local guide = Instance.new("Highlight")
+guide.Name = "EggstrideFirstRun"
+guide.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+guide.FillColor = colors.gold
+guide.FillTransparency = 0.82
+guide.OutlineColor = colors.gold
+guide.Enabled = false
+guide.Parent = workspace
+
 local function update()
     local egg = player:GetAttribute("EggName")
     local ability = player:GetAttribute("EggAbility")
@@ -64,11 +77,32 @@ local function update()
         elseif player:GetAttribute("Delivered") then "Яйцо спасено · жди следующего забега"
         elseif cost then "Следующая тренировка: " .. cost .. " монет"
         else "Выбирай остров и возвращайся до закрытия"
+    local step = player:GetAttribute("OnboardingStep")
+    local target
+    if (step == 1 or step == 2) and not player:GetAttribute("Delivered") then
+        if egg and egg ~= "" then
+            objective.Text = "Донеси яйцо до подсвеченного инкубатора"
+            target = hatchTarget.Value
+        elseif runOpen then
+            objective.Text = "Забери яйцо на Луговом острове"
+            target = eggTarget.Value
+        else
+            objective.Text = "Подойди к воротам и дождись старта"
+            target = gateTarget.Value
+        end
+    elseif step == 3 and (not egg or egg == "") then
+        objective.Text = "Открой «Питомцы» и попробуй новый забег"
+    end
+    guide.Adornee = target
+    guide.Enabled = target ~= nil
     notice.Text = player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
+end
+for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do
+    target:GetPropertyChangedSignal("Value"):Connect(update)
 end
 update()
 
@@ -76,6 +110,10 @@ while true do
     local start = round:GetAttribute("StartedAt")
     if start then
         local open, left = Rules.clock(math.max(0, workspace:GetServerTimeNow() - start))
+        if open ~= runOpen then
+            runOpen = open
+            update()
+        end
         timer.Text = string.format("%s  ·  %02d сек", if open then "ЗАБЕГ" else "ПОДГОТОВКА", left)
         timer.TextColor3 = if open and left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
     end

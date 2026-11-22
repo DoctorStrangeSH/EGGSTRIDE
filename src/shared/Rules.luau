@@ -75,4 +75,13 @@ function Rules.hatchForRoll(vault, egg, roll)
     return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
 end
 
+function Rules.onboardingAfterPickup(step)
+    if step == 1 then
+        return 2
+    elseif step == 3 then
+        return 4
+    end
+    return step
+end
+
 return Rules

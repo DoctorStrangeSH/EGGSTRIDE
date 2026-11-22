@@ -1,4 +1,6 @@
+local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
@@ -18,6 +20,13 @@ local startedAt = workspace:GetServerTimeNow()
 local round = Instance.new("Folder")
 round.Name = "Round"
 round:SetAttribute("StartedAt", startedAt)
+local targets = { Gate = map.gate, FirstEgg = map.vaults[1].part, Hatch = map.hatch.Parent }
+for name, part in pairs(targets) do
+    local marker = Instance.new("ObjectValue")
+    marker.Name = name
+    marker.Value = part
+    marker.Parent = round
+end
 round.Parent = Shared
 
 local equipPet = Instance.new("RemoteEvent")
@@ -28,6 +37,28 @@ local entries = {}
 local loading = {}
 local closing = false
 local pending = 0
+local logAnalytics = not RunService:IsStudio()
+local onboardingSteps = {
+    "Joined with profile",
+    "Picked up first egg",
+    "Hatched first pet",
+    "Picked up another egg",
+}
+
+local function advanceOnboarding(player, entry, step)
+    if step <= entry.onboarding then
+        return
+    end
+    entry.onboarding = step
+    if logAnalytics then
+        local ok, err = pcall(function()
+            AnalyticsService:LogOnboardingFunnelStepEvent(player, step, onboardingSteps[step])
+        end)
+        if not ok then
+            warn("EGGSTRIDE: onboarding analytics failed", step, err)
+        end
+    end
+end
 
 local function leave(player)
     local entry = entries[player]
@@ -63,6 +94,7 @@ local function applySpeed(player, entry)
 end
 
 local function publish(player, entry, message)
+    player:SetAttribute("OnboardingStep", entry.onboarding)
     player:SetAttribute("Coins", entry.coins)
     player:SetAttribute("SpeedTier", entry.tier)
     player:SetAttribute("EquippedPetId", entry.pet and entry.pet.id or "")
@@ -147,6 +179,7 @@ local function join(player)
     local entry = {
         session = session,
         coins = record.coins,
+        onboarding = record.onboarding,
         tier = record.tier,
         pet = petCatalog[record.equipped],
         delivered = false,
@@ -159,6 +192,7 @@ local function join(player)
     end
     entries[player] = entry
     pending -= 1
+    advanceOnboarding(player, entry, 1)
     publish(player, entry, "Заработай скорость в лагере или сразу попробуй ближайший остров.")
 
     local function spawn(character)
@@ -263,6 +297,7 @@ for index, display in ipairs(map.vaults) do
         end
         local egg = roundEggs[index]
         entry.egg = egg
+        advanceOnboarding(player, entry, Rules.onboardingAfterPickup(entry.onboarding))
         entry.eggVault = vault
         entry.eggVisual = accessory(root, "EggstrideEgg", World.variantColor(egg),
             Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
@@ -306,6 +341,7 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
         entry.pet = pet
         showPet(root, pet)
     end
+    advanceOnboarding(player, entry, 3)
     local result = if isNew then "Новый в журнале: " else "Вылупился "
     publish(player, entry, result .. pet.name .. " · " .. pet.rarity .. " · +" .. vault.coins .. " монет.")
 end)

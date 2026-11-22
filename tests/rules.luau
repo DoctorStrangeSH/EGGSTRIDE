@@ -54,4 +54,8 @@ for _, vault in ipairs(Rules.Vaults) do
         assert(rare == Rules.RarePetChance[egg.rarity], "Wrong hatch odds: " .. egg.id)
     end
 end
+assert(Rules.onboardingAfterPickup(1) == 2)
+assert(Rules.onboardingAfterPickup(2) == 2)
+assert(Rules.onboardingAfterPickup(3) == 4)
+assert(Rules.onboardingAfterPickup(4) == 4)
 print("Eggstride rules: OK")
