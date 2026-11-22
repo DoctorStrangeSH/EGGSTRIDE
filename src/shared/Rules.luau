@@ -17,7 +17,7 @@ Rules.StormTrial = { name = "Грозовой след", secondsLeft = 5 }
 Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
 Rules.Vaults = {
     {
-        name = "Луговой", x = 63, tier = 1, coins = 32,
+        id = "meadow", name = "Луговой", x = 63, tier = 1, coins = 32,
         pets = {
             common = { id = "leaf_tail", name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
             rare = { id = "dew_moth", name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
@@ -28,7 +28,7 @@ Rules.Vaults = {
         },
     },
     {
-        name = "Янтарный", x = 143, tier = 2, coins = 54,
+        id = "amber", name = "Янтарный", x = 143, tier = 2, coins = 54,
         pets = {
             common = { id = "amber_crab", name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
             rare = { id = "prism_fox", name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
@@ -39,7 +39,7 @@ Rules.Vaults = {
         },
     },
     {
-        name = "Грозовой", x = 252, tier = 4, coins = 95,
+        id = "storm", name = "Грозовой", x = 252, tier = 4, coins = 95,
         pets = {
             common = { id = "thunder_puff", name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
             rare = { id = "lightning_kite", name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
@@ -81,6 +81,21 @@ end
 
 function Rules.hatchForRoll(vault, egg, roll)
     return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
+end
+
+function Rules.improvedDelivery(previous, elapsed)
+    if not (elapsed > 0 and elapsed <= Rules.RunSeconds) then
+        return nil
+    end
+    local milliseconds = math.max(1, math.round(elapsed * 1000))
+    if not previous or milliseconds < previous then
+        return milliseconds
+    end
+    return nil
+end
+
+function Rules.deliveryTimeText(milliseconds)
+    return (string.format("%.2f", milliseconds / 1000):gsub("%.", ",")) .. " сек."
 end
 
 function Rules.stormTrialComplete(egg, usedAbility, secondsLeft)

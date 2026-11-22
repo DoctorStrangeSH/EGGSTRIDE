@@ -25,7 +25,7 @@ local function addLabel(parent, textSize, y, height)
     return label
 end
 
-function RunFeedback.connect(gui, event)
+function RunFeedback.connect(gui, event, rules)
     local tickSound = sound("Countdown", "volume_slider.ogg", 1.15, 0.30)
     local startSound = sound("GateOpen", "volume_slider.ogg", 1.65, 0.40)
     local hatchSound = sound("Hatch", "action_get_up.mp3", 1.10, 0.50)
@@ -72,13 +72,13 @@ function RunFeedback.connect(gui, event)
         end)
     end
 
-    event.OnClientEvent:Connect(function(kind, petName, rarity, coins, isNew, rewardName)
+    event.OnClientEvent:Connect(function(kind, petName, rarity, coins, isNew, rewardName, personalBest)
         if kind == "Hatch" then
             local accent = if rarity == "Редкий" then Color3.fromRGB(255, 209, 117) else Color3.fromRGB(163, 255, 201)
             local collection = if rewardName then "\nНаграда · " .. rewardName
-                elseif isNew then " · Новый в журнале"
+                elseif personalBest then "\nЛичный рекорд · " .. rules.deliveryTimeText(personalBest)
                 else ""
-            show(petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
+            show(if isNew then petName .. " · новый вид" else petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
             hatchSound.PlaybackSpeed = if rarity == "Редкий" then 1.28 else 1.10
             hatchSound:Play()
         elseif kind == "Timeout" or kind == "Fall" then

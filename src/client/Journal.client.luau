@@ -98,12 +98,22 @@ trialPadding.PaddingLeft = UDim.new(0, 10)
 trialPadding.PaddingRight = UDim.new(0, 10)
 
 local rows = {}
+local recordLabels = {}
+local order = 0
 
 for _, vault in ipairs(Rules.Vaults) do
+    order += 1
+    local record = textItem("TextLabel", list, "", 13, palette.gold)
+    record.Name = "DeliveryRecord_" .. vault.id
+    record.LayoutOrder = order
+    record.Size = UDim2.new(1, -8, 0, 32)
+    record.TextWrapped = true
+    recordLabels[vault] = record
     for _, pet in ipairs({ vault.pets.common, vault.pets.rare }) do
         local row = Instance.new("Frame")
         row.Name = pet.id
-        row.LayoutOrder = #rows + 1
+        order += 1
+        row.LayoutOrder = order
         row.Size = UDim2.new(1, -8, 0, 78)
         row.Parent = list
         fill(row, palette.row, 10)
@@ -118,8 +128,8 @@ for _, vault in ipairs(Rules.Vaults) do
         if pet == vault.pets.common then
             commonEggOdds, rareEggOdds = 100 - commonEggOdds, 100 - rareEggOdds
         end
-        local condition = string.format("%s · %s\nИз обычного яйца %d%%, редкого %d%%",
-            vault.name, pet.rarity, commonEggOdds, rareEggOdds)
+        local condition = string.format("%s\nИз обычного яйца %d%%, редкого %d%%",
+            pet.rarity, commonEggOdds, rareEggOdds)
         local details = textItem("TextLabel", row, condition, 12, palette.muted)
         details.Position = UDim2.fromOffset(10, 29)
         details.Size = UDim2.new(1, -112, 0, 42)
@@ -148,6 +158,10 @@ local function update()
         trial.Text = string.format("%s\nДоставь грозовое яйцо через маяк, пока на таймере %d+ сек.",
             Rules.StormTrial.name, Rules.StormTrial.secondsLeft)
     end
+    for vault, label in pairs(recordLabels) do
+        local time = player:GetAttribute("DeliveryRecord_" .. vault.id)
+        label.Text = vault.name .. (if time then " · Рекорд " .. Rules.deliveryTimeText(time) else " · Пока без рекорда")
+    end
     local count = 0
     for _, row in ipairs(rows) do
         local owned = player:GetAttribute("OwnsPet_" .. row.id) == true
@@ -167,6 +181,9 @@ end
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)
 player:GetAttributeChangedSignal("StormTrailUnlocked"):Connect(update)
+for vault in pairs(recordLabels) do
+    player:GetAttributeChangedSignal("DeliveryRecord_" .. vault.id):Connect(update)
+end
 for _, row in ipairs(rows) do
     player:GetAttributeChangedSignal("OwnsPet_" .. row.id):Connect(update)
 end

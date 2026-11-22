@@ -164,6 +164,7 @@ end
 local function clearEgg(player, entry)
     entry.egg = nil
     entry.eggVault = nil
+    entry.pickupAt = nil
     entry.abilityUsed = false
     entry.anchorEndsAt = nil
     entry.windFactor = nil
@@ -207,6 +208,7 @@ local function join(player)
         coins = record.coins,
         onboarding = record.onboarding,
         stormTrailUnlocked = record.stormTrailUnlocked,
+        deliveryRecords = record.deliveryRecords,
         tier = record.tier,
         pet = petCatalog[record.equipped],
         delivered = false,
@@ -216,6 +218,9 @@ local function join(player)
     for id in pairs(record.owned) do
         entry.ownedPets[id] = petCatalog[id]
         player:SetAttribute("OwnsPet_" .. id, true)
+    end
+    for id, time in pairs(record.deliveryRecords) do
+        player:SetAttribute("DeliveryRecord_" .. id, time)
     end
     entries[player] = entry
     pending -= 1
@@ -367,13 +372,13 @@ local function syncRound()
             root.AssemblyLinearVelocity = Vector3.zero
         end
     end
-    return open, secondsLeft
+    return open, secondsLeft, now
 end
 
 for index, display in ipairs(map.vaults) do
     local vault = Rules.Vaults[index]
     withNearbyPlayer(display.prompt, function(player, entry, root)
-        local open = syncRound()
+        local open, _, now = syncRound()
         if not Rules.canCollect(entry.tier, vault, entry.egg ~= nil, open, entry.delivered) then
             if open and entry.tier < vault.tier then
                 publish(player, entry, "Для этого яйца нужен уровень скорости " .. vault.tier .. ".")
@@ -382,6 +387,7 @@ for index, display in ipairs(map.vaults) do
         end
         local egg = roundEggs[index]
         entry.egg = egg
+        entry.pickupAt = now
         advanceOnboarding(player, entry, Rules.onboardingAfterPickup(entry.onboarding))
         entry.eggVault = vault
         entry.eggVisual = accessory(root, "EggstrideEgg", World.variantColor(egg),
@@ -489,12 +495,17 @@ withNearbyPlayer(map.stormRelay.prompt, function(player, entry, root)
 end)
 
 withNearbyPlayer(map.hatch, function(player, entry, root)
-    local open, secondsLeft = syncRound()
+    local open, secondsLeft, now = syncRound()
     if not open or not entry.egg then
         return
     end
     local egg = entry.egg
     local vault = entry.eggVault
+    local personalBest = Rules.improvedDelivery(entry.deliveryRecords[vault.id], now - entry.pickupAt)
+    if personalBest then
+        entry.deliveryRecords[vault.id] = personalBest
+        player:SetAttribute("DeliveryRecord_" .. vault.id, personalBest)
+    end
     local unlockedTrail = not entry.stormTrailUnlocked and Rules.stormTrialComplete(egg, entry.abilityUsed, secondsLeft)
     if unlockedTrail then
         entry.stormTrailUnlocked = true
@@ -516,7 +527,7 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
     local result = if isNew then "Новый в журнале: " else "Вылупился "
     publish(player, entry, result .. pet.name .. " · " .. pet.rarity .. " · +" .. vault.coins .. " монет.")
     runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins, isNew,
-        if unlockedTrail then Rules.StormTrial.name else nil)
+        if unlockedTrail then Rules.StormTrial.name else nil, personalBest)
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)

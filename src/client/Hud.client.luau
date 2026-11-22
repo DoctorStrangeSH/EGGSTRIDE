@@ -21,7 +21,7 @@ gui.Name = "EggstrideHud"
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 gui.Parent = player:WaitForChild("PlayerGui")
-local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"))
+local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"), Rules)
 
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(0.5, 0)

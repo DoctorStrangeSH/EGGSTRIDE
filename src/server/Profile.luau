@@ -6,7 +6,7 @@ Profile.LEASE_SECONDS = 180
 function Profile.new(startCoins)
     return {
         version = Profile.VERSION, coins = startCoins, tier = 1, owned = {},
-        equipped = nil, onboarding = 0, stormTrailUnlocked = false,
+        equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
     }
 end
 
@@ -14,9 +14,9 @@ local function wholeNumber(value, low, high)
     return type(value) == "number" and value >= low and value <= high and value % 1 == 0
 end
 
-function Profile.read(stored, catalog, maxTier)
+function Profile.read(stored, catalog, rules)
     if type(stored) ~= "table" or stored.version ~= Profile.VERSION
-        or not wholeNumber(stored.coins, 0, 9e15) or not wholeNumber(stored.tier, 1, maxTier)
+        or not wholeNumber(stored.coins, 0, 9e15) or not wholeNumber(stored.tier, 1, #rules.Speeds)
         or type(stored.owned) ~= "table" then
         return nil
     end
@@ -24,6 +24,14 @@ function Profile.read(stored, catalog, maxTier)
     local record = Profile.new(stored.coins)
     record.tier = stored.tier
     record.stormTrailUnlocked = stored.stormTrailUnlocked == true
+    if type(stored.deliveryRecords) == "table" then
+        for _, vault in ipairs(rules.Vaults) do
+            local time = stored.deliveryRecords[vault.id]
+            if wholeNumber(time, 1, rules.RunSeconds * 1000) then
+                record.deliveryRecords[vault.id] = time
+            end
+        end
+    end
     for id, owned in pairs(stored.owned) do
         if owned == true and catalog[id] then
             record.owned[id] = true
@@ -46,6 +54,7 @@ function Profile.snapshot(entry)
     local record = Profile.new(entry.coins)
     record.tier = entry.tier
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true
+    record.deliveryRecords = table.clone(entry.deliveryRecords)
     record.onboarding = entry.onboarding
     for id in pairs(entry.ownedPets) do
         record.owned[id] = true
@@ -54,12 +63,12 @@ function Profile.snapshot(entry)
     return record
 end
 
-function Profile.acquire(stored, owner, now, catalog, maxTier, startCoins)
+function Profile.acquire(stored, owner, now, catalog, rules)
     local record
     if stored == nil then
-        record = Profile.new(startCoins)
+        record = Profile.new(rules.StartCoins)
     else
-        record = Profile.read(stored, catalog, maxTier)
+        record = Profile.read(stored, catalog, rules)
         if not record then
             return nil, "invalid"
         end

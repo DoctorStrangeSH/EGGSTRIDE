@@ -29,7 +29,7 @@ function ProfileStore.open(player, catalog, rules, canContinue)
         local ok, record = pcall(function()
             return store:UpdateAsync(session.key, function(stored)
                 local updated
-                updated, reason = Profile.acquire(stored, session.owner, os.time(), catalog, #rules.Speeds, rules.StartCoins)
+                updated, reason = Profile.acquire(stored, session.owner, os.time(), catalog, rules)
                 return updated
             end)
         end)
