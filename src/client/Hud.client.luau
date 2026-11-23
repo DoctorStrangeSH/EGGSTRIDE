@@ -14,6 +14,8 @@ local hatchTarget = round:WaitForChild("Hatch")
 local trainingTarget = round:WaitForChild("Training")
 local abilityTargets = {
     vine = round:WaitForChild("Vine"),
+    vineExit = round:WaitForChild("VineExit"),
+    vineBypass = round:WaitForChild("VineBypass"),
     relay = round:WaitForChild("Relay"),
     windEntrance = round:WaitForChild("WindEntrance"),
     windExit = round:WaitForChild("WindExit"),
@@ -203,6 +205,12 @@ local function updateGuide()
     waypoint.Enabled = nearby and waypoint.Adornee ~= nil
 end
 
+local returnHints = {
+    vineExit = text("По лиане в лагерь"),
+    vineBypass = text("Лиана закрылась · по обычному мосту"),
+    windExit = text("По тропе к Луговому острову"),
+}
+
 local onboardingTargets = {
     firstEgg = eggTarget, nextEgg = eggTarget, train = trainingTarget, gate = gateTarget,
 }
@@ -227,12 +235,11 @@ local function update()
     objective.Text = if delivered then text("Яйцо спасено") else prizeStatus or ""
     local target
     if carrying then
-        local anchorTarget = player:GetAttribute("AnchorReturnTarget") or "windEntrance"
-        local shortcut = abilityTargets[if abilityId == "anchor" then anchorTarget else abilityId]
-        target = shortcut and shortcut.Value or hatchTarget.Value
-        objective.Text = if abilityId == "anchor" and anchorTarget == "windExit" then text("По тропе к Луговому острову")
-            elseif ability and shortcut then text(ability.hint)
-            else text("К инкубатору")
+        local route = player:GetAttribute("EggReturnTarget")
+            or (if abilityId == "anchor" then "windEntrance" else abilityId)
+        local marker = abilityTargets[route]
+        target = marker and marker.Value or hatchTarget.Value
+        objective.Text = returnHints[route] or (if ability and marker then text(ability.hint) else text("К инкубатору"))
     else
         local objectiveKey = Rules.onboardingObjective(player:GetAttribute("OnboardingStep"), runOpen, delivered, tier)
         if objectiveKey then
@@ -268,7 +275,7 @@ local function update()
     updateNotice()
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "AnchorReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "EggReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do

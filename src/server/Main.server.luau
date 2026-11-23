@@ -80,7 +80,7 @@ round.Name = "Round"
 round:SetAttribute("StartedAt", startedAt)
 local targets = {
     Gate = map.gate, FirstEgg = map.vaults[1].part, Hatch = map.hatch, Training = map.shop.Parent,
-    Vine = map.sprout, Relay = map.stormRelay.origin,
+    Vine = map.sprout, VineExit = map.vineExit, VineBypass = map.vineBypass, Relay = map.stormRelay.origin,
     WindEntrance = map.windTrail.amberMarker, WindExit = map.windTrail.meadowMarker,
 }
 for name, point in pairs(map.weekly.points) do
@@ -389,7 +389,7 @@ local function clearEgg(player, entry, outcome)
     entry.windFactor = nil
     entry.windPosition = nil
     entry.windSampleAt = nil
-    player:SetAttribute("AnchorReturnTarget", nil)
+    player:SetAttribute("EggReturnTarget", nil)
     player:SetAttribute("WindEffect", nil)
     if entry.eggVisual then
         entry.eggVisual:Destroy()
@@ -605,6 +605,22 @@ local function onBridge(root, bridge)
         and delta.Y >= 0 and delta.Y <= 9
 end
 
+local function updateReturnTarget(player, entry, root)
+    local ability = entry.egg.ability
+    local x = root.Position.X
+    local target
+    if ability == "anchor" then
+        target = Rules.anchorReturnTarget(x, map.windTrail.meadowMarker.Position.X,
+            map.windTrail.amberMarker.Position.X, onBridge(root, map.windTrail.part))
+    elseif ability == "vine" then
+        target = Rules.vineReturnTarget(x, map.vineExit.Position.X, map.vine.Position.X + map.vine.Size.X / 2,
+            onBridge(root, map.vine), vineEndsAt ~= nil, entry.abilityUsed)
+    end
+    if player:GetAttribute("EggReturnTarget") ~= target then
+        player:SetAttribute("EggReturnTarget", target)
+    end
+end
+
 local function trackReturnBridge(entry, root, bridge)
     local relativeX = (root.Position.X - bridge.Position.X) / bridge.Size.X
     entry.routeStage = Rules.returnBridgeStage(entry.routeStage, relativeX)
@@ -616,13 +632,6 @@ local function updateWind(player, entry, humanoid, root, now, open)
     if open and root and humanoid and humanoid.Health > 0 and not entry.weekly then
         local trail = map.windTrail.part
         local onTrail = onBridge(root, trail)
-        if entry.egg and entry.egg.ability == "anchor" then
-            local target = Rules.anchorReturnTarget(root.Position.X, map.windTrail.meadowMarker.Position.X,
-                map.windTrail.amberMarker.Position.X, onTrail)
-            if player:GetAttribute("AnchorReturnTarget") ~= target then
-                player:SetAttribute("AnchorReturnTarget", target)
-            end
-        end
         if onTrail then
             local deltaTime = entry.windSampleAt and now - entry.windSampleAt
             if deltaTime and deltaTime < 0.1 then
@@ -916,6 +925,7 @@ local function syncRound()
                 hatch(player, entry, root, secondsLeft, now, week)
             else
                 updateAbility(player, entry, root, now)
+                updateReturnTarget(player, entry, root)
             end
         end
         updateWind(player, entry, humanoid, root, now, open)

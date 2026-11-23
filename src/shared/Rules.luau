@@ -316,6 +316,15 @@ function Rules.anchorReturnTarget(x, meadowEdge, amberEdge, onTrail)
     return if x >= amberEdge then "windEntrance" else "hatch"
 end
 
+function Rules.vineReturnTarget(x, campEdge, meadowEdge, onVine, active, used)
+    if x <= campEdge or (x < meadowEdge and (not onVine or not active)) then
+        return "hatch"
+    elseif active and (onVine or used) then
+        return "vineExit"
+    end
+    return if used then "vineBypass" else "vine"
+end
+
 function Rules.returnBridgeStage(stage, relativeX)
     if stage == 0 and relativeX >= 0.25 then
         return 1

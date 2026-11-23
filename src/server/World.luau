@@ -335,12 +335,19 @@ function World.build(rules)
     sign(shop, "Прокачка скорости")
 
     local meadowEdge = rules.Vaults[1].x - 20
-    runway(scene, 24, meadowEdge, -7)
-    local vine = part(scene, "Мост из лиан", Vector3.new(meadowEdge - 24, 0.8, 14),
-        Vector3.new((meadowEdge + 24) / 2, -0.4, 10), Colors.grass, false)
+    local campEdge = 24
+    local safeLane = -7
+    local vineLane = 10
+    runway(scene, campEdge, meadowEdge, safeLane)
+    local vineBypass = part(scene, "Вход на обычный мост", Vector3.new(0.75, 1.5, 0.75),
+        Vector3.new(meadowEdge + 1, 0.75, safeLane + 3), Colors.wood, false)
+    local vineExit = part(scene, "Выход с моста из лиан", Vector3.new(0.75, 1.5, 0.75),
+        Vector3.new(campEdge, 0.75, vineLane + 3), Colors.grass, false)
+    local vine = part(scene, "Мост из лиан", Vector3.new(meadowEdge - campEdge, 0.8, 14),
+        Vector3.new((meadowEdge + campEdge) / 2, -0.4, vineLane), Colors.grass, false)
     World.showVine(vine, false)
     local sprout = part(scene, "Росток", Vector3.new(5, 0.35, 5),
-        Vector3.new(meadowEdge + 2, 0.18, 10), Colors.grass, false)
+        Vector3.new(meadowEdge + 2, 0.18, vineLane), Colors.grass, false)
     sprout.Material = Enum.Material.Neon
     sign(sprout, "Лиана → Лагерь")
     local gate = part(scene, "Ворота", Vector3.new(1, 10, 42), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
@@ -422,6 +429,8 @@ function World.build(rules)
         stormRelay = stormRelay,
         vine = vine,
         sprout = sprout,
+        vineExit = vineExit,
+        vineBypass = vineBypass,
         prizes = prizes,
         hatch = hatch,
         shop = prompt(shop, "Купить скорость", "SpeedUpgrade"),
