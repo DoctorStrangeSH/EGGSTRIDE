@@ -2,6 +2,8 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
@@ -15,9 +17,21 @@ local RoundPrize = require(script.Parent.RoundPrize)
 local Profile = require(script.Parent.Profile)
 local ProfileStore = require(script.Parent.ProfileStore)
 local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
+local PlaytestReport = require(script.Parent.PlaytestReport)
 
 local inStudio = RunService:IsStudio()
 local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
+local windEnabled = workspace:GetAttribute("WindTrailEnabled") ~= false
+local playtest
+if inStudio and workspace:GetAttribute("PlaytestReportEnabled") == true then
+    playtest = PlaytestReport.new(Rules.Vaults, windEnabled)
+    local report = Instance.new("BindableFunction")
+    report.Name = "EggstridePlaytestReport"
+    report.OnInvoke = function()
+        return HttpService:JSONEncode(playtest.totals)
+    end
+    report.Parent = ServerStorage
+end
 local function languageFor(player)
     return Locale.language(if type(studioLanguage) == "string" then studioLanguage else player.LocaleId)
 end
@@ -200,6 +214,9 @@ local function leave(player)
         return
     end
     entries[player] = nil
+    if playtest then
+        playtest:leave(player)
+    end
     releasePrize(player, entry)
     pending += 1
     local ok, reason = ProfileStore.save(entry.session, Profile.snapshot(entry), true)
@@ -358,7 +375,10 @@ local function showPet(root, pet, stormTrailUnlocked)
     end
 end
 
-local function clearEgg(player, entry)
+local function clearEgg(player, entry, outcome)
+    if playtest and outcome and entry.egg then
+        playtest:finish(player, outcome)
+    end
     releasePrize(player, entry)
     entry.egg = nil
     entry.eggVault = nil
@@ -500,6 +520,9 @@ local function join(player)
         player:SetAttribute(attribute, entry[field])
     end
     entries[player] = entry
+    if playtest then
+        playtest:join(player, workspace:GetServerTimeNow(), record.onboarding == 0)
+    end
     initPremium(player, entry)
     cosmeticShop.init(player, entry)
     pending -= 1
@@ -516,7 +539,7 @@ local function join(player)
             character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
         end
         stopWeekly(player, entry)
-        clearEgg(player, entry)
+        clearEgg(player, entry, "respawn")
         publish(player, entry)
         cosmeticShop.apply(player, entry)
         if entry.pet then
@@ -532,7 +555,7 @@ local function join(player)
                 runFeedback:FireClient(player, "WeeklyStopped")
             end
             local lost = entry.egg ~= nil
-            clearEgg(player, entry)
+            clearEgg(player, entry, "fall")
             if lost then
                 runFeedback:FireClient(player, "Fall")
             end
@@ -566,7 +589,6 @@ local random = Random.new()
 local roundEggs = {}
 local prizeEggs = {}
 local vineEndsAt = nil
-local windEnabled = workspace:GetAttribute("WindTrailEnabled") ~= false
 local windDirection = 0
 local switchedWind = false
 local windSwitchEndsAt
@@ -736,6 +758,9 @@ local function hatch(player, entry, root, secondsLeft, now, week)
         showPrize(definition, false, "Доставил: %s", player.DisplayName)
     end
     local routeCompleted = entry.routeStage == 2
+    if playtest then
+        playtest:finish(player, "delivered", now, secondsLeft, routeCompleted)
+    end
     local catalystAwarded = Profile.awardCatalyst(entry, vault, entry.routeStage)
     clearEgg(player, entry)
     entry.delivered = true
@@ -794,7 +819,7 @@ local function syncRound()
         for player, entry in pairs(entries) do
             entry.delivered = false
             local lost = entry.egg ~= nil
-            clearEgg(player, entry)
+            clearEgg(player, entry, "timeout")
             if lost then
                 runFeedback:FireClient(player, "Timeout")
             end
@@ -944,6 +969,9 @@ local function pickUp(player, entry, root, vaultIndex, definition)
     end
     if definition then
         if not RoundPrize.claim(prizes[definition.id], player) then
+            if playtest then
+                playtest:missPrize(vault.id)
+            end
             return
         end
         entry.prize = definition
@@ -953,6 +981,9 @@ local function pickUp(player, entry, root, vaultIndex, definition)
     entry.pickupAt = now
     advanceOnboarding(player, entry, Rules.onboardingAfterPickup(entry.onboarding))
     entry.eggVault = vault
+    if playtest then
+        playtest:pickUp(player, vault.id, definition ~= nil, now)
+    end
     entry.eggVisual = accessory(root, "EggstrideEgg", World.VaultColors[vaultIndex],
         Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
     applySpeed(player, entry)
@@ -1023,6 +1054,9 @@ withNearbyPlayer(map.shop, function(player, entry)
         applySpeed(player, entry)
         local vault = Rules.Vaults[entry.tier]
         if vault then
+            if playtest then
+                playtest:upgrade(player, vault.id, workspace:GetServerTimeNow())
+            end
             publish(player, entry, "Открыт %s остров", translate(player, vault.name))
         else
             publish(player, entry, "Скорость повышена до уровня %d.", entry.tier)
