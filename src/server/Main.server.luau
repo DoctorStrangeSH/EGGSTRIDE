@@ -1,3 +1,4 @@
+local MarketplaceService = game:GetService("MarketplaceService")
 local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -84,6 +85,10 @@ local claimSeason = Instance.new("RemoteEvent")
 claimSeason.Name = "ClaimSeasonReward"
 claimSeason.Parent = Shared
 
+local seasonPass = Instance.new("RemoteEvent")
+seasonPass.Name = "SeasonPass"
+seasonPass.Parent = Shared
+
 local runFeedback = Instance.new("RemoteEvent")
 runFeedback.Name = "RunFeedback"
 runFeedback.Parent = Shared
@@ -118,7 +123,37 @@ local function releasePrize(player, entry)
     end
     entry.prize = nil
 end
-local logAnalytics = not RunService:IsStudio()
+local inStudio = RunService:IsStudio()
+local previewSeasonPass = inStudio and workspace:GetAttribute("UseStudioDataStore") ~= true
+local configuredPassId = workspace:GetAttribute("SeasonPassId")
+local seasonPassId = if type(configuredPassId) == "number" and configuredPassId > 0
+    and configuredPassId <= 9e15 and configuredPassId % 1 == 0 then configuredPassId else nil
+
+local function setPremiumStatus(player, entry, status)
+    entry.premiumStatus = status
+    entry.seasonPremium = status == "owned" or status == "previewOwned"
+    player:SetAttribute("SeasonPremiumStatus", status)
+end
+
+local function refreshPremium(player, entry)
+    setPremiumStatus(player, entry, "checking")
+    local ok, owns = pcall(MarketplaceService.UserOwnsGamePassAsync, MarketplaceService, player.UserId, seasonPassId)
+    if entries[player] == entry and not closing and entry.premiumStatus == "checking" then
+        setPremiumStatus(player, entry, if not ok then "error" elseif owns then "owned" else "locked")
+    end
+end
+
+local function initPremium(player, entry)
+    if previewSeasonPass then
+        setPremiumStatus(player, entry, "preview")
+    elseif inStudio or not seasonPassId then
+        setPremiumStatus(player, entry, "unavailable")
+    else
+        task.spawn(refreshPremium, player, entry)
+    end
+end
+
+local logAnalytics = not inStudio
 local onboardingSteps = {
     "Joined with profile",
     "Picked up first egg",
@@ -206,6 +241,9 @@ local function publishSeason(player, entry)
     end
     for index in ipairs(Rules.Season.rewards) do
         player:SetAttribute("SeasonClaimed_" .. index, progress.claimed[tostring(index)] == true)
+    end
+    for index in ipairs(Rules.Season.premiumRewards) do
+        player:SetAttribute("SeasonPremiumClaimed_" .. index, progress.claimed["premium_" .. index] == true)
     end
 end
 
@@ -395,6 +433,7 @@ local function join(player)
         nextBreedAt = 0,
         nextMutationAt = 0,
         nextSeasonClaimAt = 0,
+        nextSeasonPassAt = 0,
     }
     for id in pairs(record.owned) do
         entry.ownedPets[id] = petCatalog[id]
@@ -425,6 +464,7 @@ local function join(player)
         player:SetAttribute(attribute, entry[field])
     end
     entries[player] = entry
+    initPremium(player, entry)
     pending -= 1
     advanceOnboarding(player, entry, 1)
     publish(player, entry, "")
@@ -1017,10 +1057,52 @@ mutatePet.OnServerEvent:Connect(function(player, petId)
     end
 end)
 
-claimSeason.OnServerEvent:Connect(function(player, index)
+seasonPass.OnServerEvent:Connect(function(player)
     local entry = entries[player]
+    if closing or not entry or ProfileStore.expired(entry.session) then
+        return
+    end
+    local now = os.clock()
+    if now < entry.nextSeasonPassAt then
+        return
+    end
+    entry.nextSeasonPassAt = now + 2
+
+    if previewSeasonPass and entry.premiumStatus == "preview" then
+        setPremiumStatus(player, entry, "previewOwned")
+    elseif not inStudio and seasonPassId then
+        if entry.premiumStatus == "error" then
+            refreshPremium(player, entry)
+        elseif entry.premiumStatus == "locked" then
+            setPremiumStatus(player, entry, "prompting")
+            local ok = pcall(MarketplaceService.PromptGamePassPurchase, MarketplaceService, player, seasonPassId)
+            if not ok and entries[player] == entry and entry.premiumStatus == "prompting" then
+                setPremiumStatus(player, entry, "error")
+            end
+        end
+    end
+end)
+
+if not inStudio and seasonPassId then
+    MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
+        local entry = entries[player]
+        if closing or not entry or passId ~= seasonPassId or ProfileStore.expired(entry.session) then
+            return
+        end
+        if purchased then
+            setPremiumStatus(player, entry, "owned")
+        elseif entry.premiumStatus == "prompting" then
+            setPremiumStatus(player, entry, "locked")
+        end
+    end)
+end
+
+claimSeason.OnServerEvent:Connect(function(player, index, premium)
+    local entry = entries[player]
+    local rewards = if premium == true then Rules.Season.premiumRewards else Rules.Season.rewards
     if closing or not entry or ProfileStore.expired(entry.session)
-        or typeof(index) ~= "number" or index < 1 or index > #Rules.Season.rewards or index % 1 ~= 0 then
+        or (premium ~= nil and typeof(premium) ~= "boolean")
+        or typeof(index) ~= "number" or index < 1 or index > #rewards or index % 1 ~= 0 then
         return
     end
     local now = os.clock()
@@ -1030,14 +1112,14 @@ claimSeason.OnServerEvent:Connect(function(player, index)
     entry.nextSeasonClaimAt = now + 0.2
 
     local week = Rules.weekId(os.time())
-    local claimed, rolledOver = Season.claim(entry, Rules.Season, week, index)
+    local claimed, rolledOver = Season.claim(entry, Rules.Season, week, index, premium)
     if not claimed then
         if rolledOver then
             publishSeason(player, entry)
         end
         return
     end
-    local reward = Rules.Season.rewards[index]
+    local reward = rewards[index]
     if reward.pet then
         player:SetAttribute("OwnsPet_" .. reward.pet.id, true)
     elseif reward.material then

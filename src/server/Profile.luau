@@ -125,6 +125,12 @@ local function readSeason(stored, rules)
                 season.claimed[key] = true
             end
         end
+        for index, reward in ipairs(definition.premiumRewards) do
+            local key = "premium_" .. index
+            if stored.claimed[key] == true and season.xp >= reward.xp then
+                season.claimed[key] = true
+            end
+        end
     end
     return season
 end

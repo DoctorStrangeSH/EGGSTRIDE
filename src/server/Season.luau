@@ -60,12 +60,13 @@ function Season.recordDelivery(entry, rules, week, vault, elapsed)
     return true
 end
 
-function Season.claim(entry, definition, week, index)
+function Season.claim(entry, definition, week, index, premium)
     local rolledOver = Season.rollover(entry, definition, week)
     local progress = entry.season
-    local reward = definition.rewards[index]
-    local key = tostring(index)
-    if progress.week ~= week or not reward or progress.claimed[key] or progress.xp < reward.xp then
+    local rewards = if premium then definition.premiumRewards else definition.rewards
+    local reward = rewards[index]
+    local key = if premium then "premium_" .. index else tostring(index)
+    if (premium and not entry.seasonPremium) or progress.week ~= week or not reward or progress.claimed[key] or progress.xp < reward.xp then
         return false, rolledOver
     end
 

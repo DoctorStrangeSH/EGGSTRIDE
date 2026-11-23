@@ -76,6 +76,43 @@ assert(not Season.recordDelivery(runner, Rules, 20, meadow, 16))
 assert(not Season.recordDelivery(runner, Rules, 20, meadow, 14.999))
 assert(not Season.recordDelivery(runner, Rules, 20, meadow, 0))
 
+local premium = {
+    coins = 15, tier = 1, materials = {}, ownedPets = {},
+    deliveries = {}, prizeWins = {}, catalysts = {}, discoveries = {}, deliveryRecords = {},
+}
+Season.rollover(premium, definition, 22)
+assert(not Season.claim(premium, definition, 22, 1, true))
+premium.seasonPremium = true
+assert(not Season.claim(premium, definition, 22, 1, true))
+premium.season.xp = 360
+premium.seasonPremium = false
+assert(Season.claim(premium, definition, 22, 1) and premium.coins == 55)
+assert(not Season.claim(premium, definition, 22, 1, true))
+premium.seasonPremium = true
+assert(Season.claim(premium, definition, 22, 3, true))
+assert(Season.claim(premium, definition, 22, 1, true))
+assert(not Season.claim(premium, definition, 22, 1, true))
+assert(premium.coins == 55 and not next(premium.materials))
+assert(premium.season.claimed["1"] and premium.season.claimed.premium_1 and premium.season.claimed.premium_3)
+
+local premiumCatalog = {}
+for _, companion in ipairs(Rules.SeasonPets) do
+    premiumCatalog[companion.id] = companion
+end
+local premiumSnapshot = Profile.snapshot(premium)
+assert(premiumSnapshot.seasonPremium == nil)
+local reopened = Profile.read(premiumSnapshot, premiumCatalog, Rules)
+local firstPremiumPet = definition.premiumRewards[1].pet
+local lastPremiumPet = definition.premiumRewards[3].pet
+assert(reopened.owned[firstPremiumPet.id] and reopened.owned[lastPremiumPet.id])
+assert(reopened.season.claimed.premium_1 and reopened.season.claimed.premium_3)
+assert(not reopened.season.claimed.premium_2)
+assert(Season.rollover(premium, definition, 23))
+assert(not Season.claim(premium, definition, 23, 3, true))
+premiumSnapshot.season.xp = 70
+local filteredPremium = Profile.read(premiumSnapshot, premiumCatalog, Rules)
+assert(filteredPremium.season.claimed.premium_1 and not filteredPremium.season.claimed.premium_3)
+
 local checkpoint = Profile.snapshot(runner)
 assert(Profile.read(checkpoint, {}, Rules).season.deliveryBests.meadow == 15000)
 local changed, earned = Season.recordDelivery(runner, Rules, 20, meadow, 14.98)

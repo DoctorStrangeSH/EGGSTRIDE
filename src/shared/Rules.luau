@@ -187,6 +187,9 @@ end
 
 Rules.SeasonPets = {
     species("season_sky_firefly", "Небесный светляк", "Эпический", 133, 219, 255, "wings"),
+    species("season_sunset_firefly", "Закатный светляк", "Эпический", 255, 155, 120, "wings"),
+    species("season_lunar_firefly", "Лунный светляк", "Легендарный", 194, 177, 255, "wings"),
+    species("season_polar_firefly", "Полярный светляк", "Легендарный", 146, 255, 218, "wings"),
 }
 Rules.Season = {
     id = "sky_routes_01",
@@ -203,6 +206,11 @@ Rules.Season = {
         { xp = 120, coins = 100, label = "100 монет" },
         { xp = 220, material = "amber", amount = 3, label = "3 янтарных крошки" },
         { xp = 360, label = Rules.SeasonPets[1].name, pet = Rules.SeasonPets[1] },
+    },
+    premiumRewards = {
+        { xp = 70, label = Rules.SeasonPets[2].name, pet = Rules.SeasonPets[2] },
+        { xp = 220, label = Rules.SeasonPets[3].name, pet = Rules.SeasonPets[3] },
+        { xp = 360, label = Rules.SeasonPets[4].name, pet = Rules.SeasonPets[4] },
     },
 }
 Rules.Speeds = { 16, 20, 24, 30, 36 }

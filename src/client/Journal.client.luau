@@ -7,6 +7,7 @@ local equipPet = shared:WaitForChild("EquipPet")
 local breedPet = shared:WaitForChild("BreedPet")
 local mutatePet = shared:WaitForChild("MutatePet")
 local claimSeason = shared:WaitForChild("ClaimSeasonReward")
+local seasonPass = shared:WaitForChild("SeasonPass")
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -180,20 +181,50 @@ local function menuButton(caption, order)
 end
 
 local season = Rules.Season
-local seasonButton = menuButton("Сезон «" .. season.name .. "»  +", -30)
-local seasonInfo = description("SeasonProgress", -29, palette.text)
+local seasonButton = menuButton("Сезон «" .. season.name .. "»  +", -40)
+local seasonInfo = description("SeasonProgress", -39, palette.text)
 seasonInfo.TextXAlignment = Enum.TextXAlignment.Left
 local seasonExpanded = false
-local rewardButtons = {}
+local function addSeasonRewards(rewards, firstOrder, premium)
+    local buttons = {}
+    for index in ipairs(rewards) do
+        local action = menuButton("", firstOrder + index - 1)
+        buttons[index] = action
+        action.Activated:Connect(function()
+            if action.Active then
+                claimSeason:FireServer(index, premium)
+            end
+        end)
+    end
+    return buttons
+end
 
-for index, reward in ipairs(season.rewards) do
-    local action = menuButton("", -29 + index)
-    rewardButtons[index] = action
-    action.Activated:Connect(function()
-        if action.Active then
-            claimSeason:FireServer(index)
-        end
-    end)
+local rewardButtons = addSeasonRewards(season.rewards, -38, false)
+local premiumInfo = description("PremiumTrack", -33, palette.text)
+premiumInfo.TextXAlignment = Enum.TextXAlignment.Left
+premiumInfo.Text = "Косметическая дорожка\nТри расцветки светляка за тот же сезонный опыт."
+local premiumAction = menuButton("", -32)
+local premiumButtons = addSeasonRewards(season.premiumRewards, -31, true)
+premiumAction.Activated:Connect(function()
+    if premiumAction.Active then
+        seasonPass:FireServer()
+    end
+end)
+
+local function updateRewardButtons(rewards, buttons, xp, prefix, access)
+    for index, reward in ipairs(rewards) do
+        local action = buttons[index]
+        local claimed = player:GetAttribute(prefix .. index) == true
+        local available = xp ~= nil and xp >= reward.xp and not claimed and access
+        local status = if claimed then "Получено" elseif available then "Забрать"
+            elseif not access then reward.xp .. " XP + пропуск" else reward.xp .. " XP"
+        action.Text = string.format("%s · %s", reward.label, status)
+        action.Visible = seasonExpanded
+        action.Active = available
+        action.Selectable = available
+        action.AutoButtonColor = available
+        action.BackgroundColor3 = if claimed then palette.mint elseif available then palette.gold else palette.muted
+    end
 end
 
 local function updateSeason()
@@ -222,18 +253,25 @@ local function updateSeason()
         table.insert(lines, "Загружаем прогресс сезона…")
     end
     seasonInfo.Text = table.concat(lines, "\n\n")
-    for index, reward in ipairs(season.rewards) do
-        local action = rewardButtons[index]
-        local claimed = player:GetAttribute("SeasonClaimed_" .. index) == true
-        local available = xp ~= nil and xp >= reward.xp and not claimed
-        local status = if claimed then "Получено" elseif available then "Забрать" else reward.xp .. " XP"
-        action.Text = string.format("%s · %s", reward.label, status)
-        action.Visible = seasonExpanded
-        action.Active = available
-        action.Selectable = available
-        action.AutoButtonColor = available
-        action.BackgroundColor3 = if claimed then palette.mint elseif available then palette.gold else palette.muted
-    end
+    local status = player:GetAttribute("SeasonPremiumStatus")
+    local access = status == "owned" or status == "previewOwned"
+    local actionable = status == "preview" or status == "locked" or status == "error"
+    premiumInfo.Visible = seasonExpanded
+    premiumAction.Visible = seasonExpanded
+    premiumAction.Text = if status == "preview" then "Включить тестовый пропуск"
+        elseif status == "previewOwned" then "Тестовый пропуск активен"
+        elseif status == "owned" then "Пропуск активен"
+        elseif status == "locked" then "Купить пропуск за Robux"
+        elseif status == "error" then "Повторить проверку пропуска"
+        elseif status == "unavailable" then "Пропуск пока недоступен"
+        elseif status == "prompting" then "Покупка в окне Roblox…"
+        else "Проверяем пропуск…"
+    premiumAction.Active = actionable
+    premiumAction.Selectable = actionable
+    premiumAction.AutoButtonColor = actionable
+    premiumAction.BackgroundColor3 = if access then palette.mint elseif actionable then palette.gold else palette.muted
+    updateRewardButtons(season.rewards, rewardButtons, xp, "SeasonClaimed_", true)
+    updateRewardButtons(season.premiumRewards, premiumButtons, xp, "SeasonPremiumClaimed_", access)
 end
 
 seasonButton.Activated:Connect(function()
@@ -249,6 +287,10 @@ for _, vault in ipairs(Rules.Vaults) do
 end
 for index in ipairs(season.rewards) do
     player:GetAttributeChangedSignal("SeasonClaimed_" .. index):Connect(updateSeason)
+end
+player:GetAttributeChangedSignal("SeasonPremiumStatus"):Connect(updateSeason)
+for index in ipairs(season.premiumRewards) do
+    player:GetAttributeChangedSignal("SeasonPremiumClaimed_" .. index):Connect(updateSeason)
 end
 updateSeason()
 
