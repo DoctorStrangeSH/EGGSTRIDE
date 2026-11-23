@@ -40,21 +40,21 @@ Rules.WindSwitch = { duration = 6, partnerRadius = 14 }
 Rules.StormTrial = { name = "Грозовой след", secondsLeft = 5 }
 Rules.Vaults = {
     {
-        id = "meadow", name = "Луговой", x = 76, tier = 1, coins = 32,
+        id = "meadow", material = "Луговой нектар", name = "Луговой", x = 76, tier = 1, coins = 32,
         pets = {
             common = { id = "leaf_tail", name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
             rare = { id = "dew_moth", name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
         },
     },
     {
-        id = "amber", name = "Янтарный", x = 180, tier = 2, coins = 54,
+        id = "amber", material = "Янтарная крошка", name = "Янтарный", x = 180, tier = 2, coins = 54,
         pets = {
             common = { id = "amber_crab", name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
             rare = { id = "prism_fox", name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
         },
     },
     {
-        id = "storm", name = "Грозовой", x = 360, tier = 3, coins = 95,
+        id = "storm", material = "Грозовая пыль", name = "Грозовой", x = 360, tier = 3, coins = 95,
         pets = {
             common = { id = "thunder_puff", name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
             rare = { id = "lightning_kite", name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },

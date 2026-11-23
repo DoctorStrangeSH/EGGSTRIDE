@@ -164,6 +164,11 @@ local function publish(player, entry, message)
     end
 end
 
+local function publishBiomeProgress(player, entry, vaultId)
+    player:SetAttribute("Deliveries_" .. vaultId, entry.deliveries[vaultId] or 0)
+    player:SetAttribute("Material_" .. vaultId, entry.materials[vaultId] or 0)
+end
+
 local function accessory(root, name, color, size, offset)
     local visual = Instance.new("Part")
     visual.Name = name
@@ -300,6 +305,9 @@ local function join(player)
         onboarding = record.onboarding,
         stormTrailUnlocked = record.stormTrailUnlocked,
         deliveryRecords = record.deliveryRecords,
+        deliveries = record.deliveries,
+        prizeWins = record.prizeWins,
+        materials = record.materials,
         weeklyRecord = record.weeklyRecord,
         weeklyRewardWeek = record.weeklyRewardWeek,
         tier = record.tier,
@@ -314,6 +322,12 @@ local function join(player)
     end
     for id, time in pairs(record.deliveryRecords) do
         player:SetAttribute("DeliveryRecord_" .. id, time)
+    end
+    for _, vault in ipairs(Rules.Vaults) do
+        publishBiomeProgress(player, entry, vault.id)
+    end
+    for _, definition in ipairs(Rules.Prizes) do
+        player:SetAttribute("PrizeWins_" .. definition.id, entry.prizeWins[definition.id] or 0)
     end
     local week = Rules.weekId(os.time())
     player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
@@ -546,9 +560,13 @@ local function hatch(player, entry, root, secondsLeft, now)
     local pet = if awardedPrize and definition.id == "storm" then
         Loot.relicPetForRoll(Rules.RelicPets, random:NextInteger(1, 1000))
         else Loot.hatchForRoll(vault, egg, random:NextInteger(1, 100))
-    local isNew = entry.ownedPets[pet.id] == nil
+    local prizeId = if awardedPrize then definition.id else nil
+    local isNew, materialGain = Profile.recordHatch(entry, vault, pet, prizeId)
+    publishBiomeProgress(player, entry, vault.id)
+    if prizeId then
+        player:SetAttribute("PrizeWins_" .. prizeId, entry.prizeWins[prizeId])
+    end
     if isNew then
-        entry.ownedPets[pet.id] = pet
         player:SetAttribute("OwnsPet_" .. pet.id, true)
     end
     if not entry.pet or unlockedTrail then
@@ -558,7 +576,8 @@ local function hatch(player, entry, root, secondsLeft, now)
     advanceOnboarding(player, entry, 3)
     publish(player, entry, "")
     runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins + bonus, isNew,
-        if unlockedTrail then Rules.StormTrial.name else nil, personalBest, bonus)
+        if unlockedTrail then Rules.StormTrial.name else nil, personalBest, bonus,
+        if materialGain > 0 then vault.id else nil)
 end
 
 local function syncRound()

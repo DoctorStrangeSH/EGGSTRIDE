@@ -167,6 +167,59 @@ local function description(name, order, color)
     return label
 end
 
+local progressButton = textItem("TextButton", list, "Статистика и материалы  +", 14, palette.panel)
+progressButton.LayoutOrder = -5
+progressButton.Size = UDim2.new(1, -8, 0, 44)
+fill(progressButton, palette.gold, 10)
+
+local progress = description("BiomeProgress", -4, palette.text)
+progress.TextXAlignment = Enum.TextXAlignment.Left
+progress.Visible = false
+
+local function updateProgress()
+    if not progress.Visible then
+        return
+    end
+    if player:GetAttribute("Deliveries_" .. Rules.Vaults[1].id) == nil then
+        progress.Text = "Загружаем статистику…"
+        return
+    end
+
+    local sections = {}
+    for _, vault in ipairs(Rules.Vaults) do
+        local deliveries = player:GetAttribute("Deliveries_" .. vault.id) or 0
+        local materials = player:GetAttribute("Material_" .. vault.id) or 0
+        local record = player:GetAttribute("DeliveryRecord_" .. vault.id)
+        local heading = string.format("%s · доставок %d", vault.name, deliveries)
+        if record then
+            heading ..= " · рекорд " .. Rules.deliveryTimeText(record)
+        end
+        table.insert(sections, heading .. "\n" .. string.format("%s · %d", vault.material, materials))
+    end
+    local wins = {}
+    for _, prize in ipairs(Rules.Prizes) do
+        local count = player:GetAttribute("PrizeWins_" .. prize.id) or 0
+        table.insert(wins, string.format("%s · %d", prize.name, count))
+    end
+    table.insert(sections, "Доставлено призов\n" .. table.concat(wins, "\n"))
+    progress.Text = table.concat(sections, "\n\n")
+end
+
+progressButton.Activated:Connect(function()
+    progress.Visible = not progress.Visible
+    progressButton.Text = if progress.Visible then "Статистика и материалы  −" else "Статистика и материалы  +"
+    updateProgress()
+end)
+
+for _, vault in ipairs(Rules.Vaults) do
+    player:GetAttributeChangedSignal("Deliveries_" .. vault.id):Connect(updateProgress)
+    player:GetAttributeChangedSignal("Material_" .. vault.id):Connect(updateProgress)
+    player:GetAttributeChangedSignal("DeliveryRecord_" .. vault.id):Connect(updateProgress)
+end
+for _, prize in ipairs(Rules.Prizes) do
+    player:GetAttributeChangedSignal("PrizeWins_" .. prize.id):Connect(updateProgress)
+end
+
 local trial = description("StormTrial", 0, palette.gold)
 local weekly = description("WeeklyBest", 1, palette.text)
 

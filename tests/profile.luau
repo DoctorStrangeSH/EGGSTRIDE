@@ -26,6 +26,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 
 local pet = catalog.dew_moth
 local entry = {
+    deliveries = {}, prizeWins = {}, materials = {},
     coins = 77, tier = 2, weeklyRewardWeek = 20, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
     onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200, rankedSplits = { 2000, 4500, 6500, 9000, 12000, 15200 } }, delivered = true, egg = Loot.eggForRoll(1, 1),
 }
@@ -88,10 +89,36 @@ local invalid, invalidReason = Profile.acquire(snapshot, "server_c", 400, catalo
 assert(invalid == nil and invalidReason == "invalid")
 assert(Profile.acquire({version = 1, coins = -1, tier = 1, owned = {}}, "server_c", 400, catalog, Rules) == nil)
 
-print("Eggstride profiles: OK")
-
 local relic = Rules.RelicPets[10]
-entry.ownedPets[relic.id] = relic
+assert(not next(legacyProfile.deliveries) and not next(legacyProfile.prizeWins) and not next(legacyProfile.materials))
+local meadow, storm = Rules.Vaults[1], Rules.Vaults[3]
+local isNew, gain = Profile.recordHatch(entry, meadow, meadow.pets.common)
+assert(isNew and gain == 0 and entry.ownedPets[meadow.pets.common.id] == meadow.pets.common)
+isNew, gain = Profile.recordHatch(entry, meadow, meadow.pets.common)
+assert(not isNew and gain == 1 and entry.deliveries.meadow == 2 and entry.materials.meadow == 1)
+assert(not next(entry.prizeWins))
+isNew, gain = Profile.recordHatch(entry, storm, relic, Rules.Prizes[2].id)
+assert(isNew and gain == 0)
+isNew, gain = Profile.recordHatch(entry, storm, relic, Rules.Prizes[2].id)
+assert(not isNew and gain == 1 and entry.deliveries.storm == 2 and entry.prizeWins.storm == 2)
 entry.pet = relic
-local relicProfile = Profile.read(Profile.snapshot(entry), catalog, Rules)
+local progressSnapshot = Profile.snapshot(entry)
+local savedProgress = Profile.write(opened, progressSnapshot, "server_a", 180, true)
+local relicProfile = Profile.acquire(savedProgress, "server_d", 181, catalog, Rules)
+assert(relicProfile.deliveries.meadow == 2 and relicProfile.deliveries.storm == 2)
+assert(relicProfile.prizeWins.storm == 2 and relicProfile.materials.meadow == 1 and relicProfile.materials.storm == 1)
 assert(relicProfile.equipped == relic.id and relicProfile.owned[relic.id])
+
+Profile.recordHatch(entry, storm, relic, "storm")
+assert(progressSnapshot.deliveries.storm == 2 and progressSnapshot.prizeWins.storm == 2 and progressSnapshot.materials.storm == 1)
+progressSnapshot.deliveries.unknown = 50
+progressSnapshot.deliveries.amber = 1.5
+progressSnapshot.prizeWins.meadow = 1
+progressSnapshot.prizeWins.amber = -1
+progressSnapshot.materials.storm = "50"
+local cleanProgress = Profile.read(progressSnapshot, catalog, Rules)
+assert(cleanProgress.deliveries.meadow == 2 and not cleanProgress.deliveries.unknown and not cleanProgress.deliveries.amber)
+assert(cleanProgress.prizeWins.storm == 2 and not cleanProgress.prizeWins.meadow and not cleanProgress.prizeWins.amber)
+assert(cleanProgress.materials.meadow == 1 and not cleanProgress.materials.storm)
+
+print("Eggstride profiles: OK")

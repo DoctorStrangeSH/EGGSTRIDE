@@ -2,17 +2,53 @@ local Profile = {}
 
 Profile.VERSION = 1
 Profile.LEASE_SECONDS = 180
+local MAX_COUNTER = 9e15
 
 function Profile.new(startCoins)
     return {
         version = Profile.VERSION, coins = startCoins, tier = 1, owned = {},
         equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
         muteRunSounds = false, reduceCardMotion = false,
+        deliveries = {}, prizeWins = {}, materials = {},
     }
 end
 
 local function wholeNumber(value, low, high)
     return type(value) == "number" and value >= low and value <= high and value % 1 == 0
+end
+
+local function readCounts(stored, definitions)
+    local counts = {}
+    if type(stored) == "table" then
+        for _, definition in ipairs(definitions) do
+            local count = stored[definition.id]
+            if wholeNumber(count, 1, MAX_COUNTER) then
+                counts[definition.id] = count
+            end
+        end
+    end
+    return counts
+end
+
+local function increment(counts, id)
+    counts[id] = math.min((counts[id] or 0) + 1, MAX_COUNTER)
+end
+
+function Profile.recordHatch(entry, vault, pet, prizeId)
+    increment(entry.deliveries, vault.id)
+    if prizeId then
+        increment(entry.prizeWins, prizeId)
+    end
+
+    local isNew = entry.ownedPets[pet.id] == nil
+    local materialGain = 0
+    if isNew then
+        entry.ownedPets[pet.id] = pet
+    elseif (entry.materials[vault.id] or 0) < MAX_COUNTER then
+        increment(entry.materials, vault.id)
+        materialGain = 1
+    end
+    return isNew, materialGain
 end
 
 function Profile.read(stored, catalog, rules)
@@ -24,6 +60,9 @@ function Profile.read(stored, catalog, rules)
 
     local record = Profile.new(stored.coins)
     record.tier = stored.tier
+    record.deliveries = readCounts(stored.deliveries, rules.Vaults)
+    record.prizeWins = readCounts(stored.prizeWins, rules.Prizes)
+    record.materials = readCounts(stored.materials, rules.Vaults)
     record.muteRunSounds = stored.muteRunSounds == true
     record.reduceCardMotion = stored.reduceCardMotion == true
     record.stormTrailUnlocked = stored.stormTrailUnlocked == true
@@ -86,6 +125,9 @@ function Profile.snapshot(entry)
     record.reduceCardMotion = entry.reduceCardMotion == true
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true
     record.deliveryRecords = table.clone(entry.deliveryRecords)
+    record.deliveries = table.clone(entry.deliveries)
+    record.prizeWins = table.clone(entry.prizeWins)
+    record.materials = table.clone(entry.materials)
     record.weeklyRecord = entry.weeklyRecord
     record.weeklyRewardWeek = entry.weeklyRewardWeek
     record.onboarding = entry.onboarding
