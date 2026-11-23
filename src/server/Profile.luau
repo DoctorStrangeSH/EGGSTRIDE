@@ -143,6 +143,12 @@ function Profile.read(stored, catalog, rules)
     end
 
     local record = Profile.new(stored.coins)
+    for _, trail in ipairs(rules.Trails) do
+        if stored.equippedTrail == trail.id then
+            record.equippedTrail = trail.id
+            break
+        end
+    end
     record.tier = stored.tier
     record.season = readSeason(stored.season, rules)
     record.deliveries = readCounts(stored.deliveries, rules.Vaults)
@@ -215,6 +221,7 @@ end
 function Profile.snapshot(entry)
     local record = Profile.new(entry.coins)
     record.tier = entry.tier
+    record.equippedTrail = entry.equippedTrail
     record.muteRunSounds = entry.muteRunSounds == true
     record.reduceCardMotion = entry.reduceCardMotion == true
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true

@@ -1,4 +1,9 @@
 local Rules = {}
+Rules.Trails = {
+    { id = "mint", name = "Мятный ветер", first = { 114, 255, 201 }, last = { 112, 189, 255 }, lifetime = 0.33 },
+    { id = "ember", name = "Янтарная искра", first = { 255, 222, 111 }, last = { 255, 114, 115 }, lifetime = 0.36 },
+    { id = "aurora", name = "Полярное сияние", first = { 198, 155, 255 }, last = { 109, 247, 230 }, lifetime = 0.40 },
+}
 
 Rules.PrepareSeconds = 7
 Rules.RunSeconds = 55

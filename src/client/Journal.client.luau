@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
@@ -8,6 +9,7 @@ local breedPet = shared:WaitForChild("BreedPet")
 local mutatePet = shared:WaitForChild("MutatePet")
 local claimSeason = shared:WaitForChild("ClaimSeasonReward")
 local seasonPass = shared:WaitForChild("SeasonPass")
+local trailShop = shared:WaitForChild("TrailShop")
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -179,6 +181,111 @@ local function menuButton(caption, order)
     fill(button, palette.gold, 10)
     return button
 end
+
+local shopButton = menuButton("Магазин следов  +", -60)
+local shopExpanded = false
+local shopCards = {}
+for index, item in ipairs(Rules.Trails) do
+    local order = shopButton.LayoutOrder + 1 + (index - 1) * 3
+    local heading = description("TrailName_" .. item.id, order, palette.text)
+    heading.Text = item.name
+
+    local swatch = Instance.new("Frame")
+    swatch.LayoutOrder = order + 1
+    swatch.Size = UDim2.new(1, -8, 0, 8)
+    swatch.BackgroundColor3 = Color3.new(1, 1, 1)
+    swatch.Parent = list
+    Instance.new("UICorner", swatch).CornerRadius = UDim.new(1, 0)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new(Color3.fromRGB(table.unpack(item.first)), Color3.fromRGB(table.unpack(item.last)))
+    gradient.Parent = swatch
+
+    local buttons = Instance.new("Frame")
+    buttons.LayoutOrder = order + 2
+    buttons.BackgroundTransparency = 1
+    buttons.Size = UDim2.new(1, -8, 0, 44)
+    buttons.Parent = list
+
+    local try = textItem("TextButton", buttons, "Примерить · 12 с", 13, palette.panel)
+    try.Size = UDim2.new(0.44, -3, 1, 0)
+    try.TextWrapped = true
+    fill(try, palette.mint, 10)
+    try.Activated:Connect(function()
+        trailShop:FireServer("try", item.id)
+        scrim.Visible = false
+        updateLauncher()
+    end)
+
+    local action = textItem("TextButton", buttons, "", 13, palette.panel)
+    action.Position = UDim2.new(0.44, 3, 0, 0)
+    action.Size = UDim2.new(0.56, -3, 1, 0)
+    action.TextWrapped = true
+    fill(action, palette.gold, 10)
+
+    local price, productChecked, fetchingPrice, offsale
+    local statusAttribute = "TrailStatus_" .. item.id
+    local function updateCard()
+        heading.Visible = shopExpanded
+        swatch.Visible = shopExpanded
+        buttons.Visible = shopExpanded
+
+        local status = player:GetAttribute(statusAttribute)
+        local selected = player:GetAttribute("EquippedTrail") == item.id
+        local passId = trailShop:GetAttribute("Pass_" .. item.id)
+        if shopExpanded and status == "locked" and passId and not (productChecked or fetchingPrice) then
+            fetchingPrice = true
+            task.defer(function()
+                local ok, info = pcall(MarketplaceService.GetProductInfoAsync, MarketplaceService, passId, Enum.InfoType.GamePass)
+                if ok then
+                    price = info.PriceInRobux
+                    offsale = info.IsForSale == false
+                end
+                productChecked = true
+                fetchingPrice = false
+                updateCard()
+            end)
+        end
+        local livePurchase = status == "locked" and productChecked and not offsale
+        local enabled = status == "preview" or status == "owned" or status == "error" or livePurchase
+        action.Text = if status == "owned" then (if selected then "Снять" else "Надеть")
+            elseif status == "preview" then "Тестовая покупка"
+            elseif status == "locked" and offsale then "Вне продажи"
+            elseif livePurchase then (if price then "Купить · " .. price .. " R$" else "Купить за Robux")
+            elseif status == "prompting" then "Окно Roblox…"
+            elseif status == "error" then "Повторить проверку"
+            elseif status == "unavailable" then "Покупка недоступна"
+            else "Загрузка…"
+        action.Active = enabled
+        action.Selectable = enabled
+        action.AutoButtonColor = enabled
+        action.BackgroundColor3 = if enabled then palette.gold else palette.muted
+    end
+
+    action.Activated:Connect(function()
+        if action.Active then
+            local status = player:GetAttribute(statusAttribute)
+            if status == "owned" then
+                local id = if player:GetAttribute("EquippedTrail") == item.id then "" else item.id
+                trailShop:FireServer("equip", id)
+            else
+                trailShop:FireServer("buy", item.id)
+            end
+        end
+    end)
+    player:GetAttributeChangedSignal(statusAttribute):Connect(updateCard)
+    player:GetAttributeChangedSignal("EquippedTrail"):Connect(updateCard)
+    trailShop:GetAttributeChangedSignal("Pass_" .. item.id):Connect(updateCard)
+    table.insert(shopCards, updateCard)
+    updateCard()
+end
+
+shopButton.Activated:Connect(function()
+    shopExpanded = not shopExpanded
+    shopButton.Text = if shopExpanded then "Магазин следов  −" else "Магазин следов  +"
+    for _, updateCard in ipairs(shopCards) do
+        updateCard()
+    end
+end)
 
 local season = Rules.Season
 local seasonButton = menuButton("Сезон «" .. season.name .. "»  +", -40)
