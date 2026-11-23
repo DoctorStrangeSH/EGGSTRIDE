@@ -131,6 +131,17 @@ assert(Rules.returnBridgeStage(1, -0.25) == 2)
 assert(Rules.returnBridgeStage(2, 0.5) == 2)
 
 
+do
+    local cost, vault, missing = Rules.nextSpeedUpgrade(1, Rules.StartCoins)
+    assert(cost == 15 and vault.id == "amber" and missing == 0)
+    cost, vault, missing = Rules.nextSpeedUpgrade(2, 32)
+    assert(cost == 35 and vault.id == "storm" and missing == 3)
+    cost, vault, missing = Rules.nextSpeedUpgrade(3, 65)
+    assert(cost == 65 and vault == nil and missing == 0)
+    cost, vault, missing = Rules.nextSpeedUpgrade(4, 0)
+    assert(cost == 95 and vault == nil and missing == 95)
+    assert(Rules.nextSpeedUpgrade(5, 500) == nil)
+end
 assert(Rules.onboardingObjective(nil, false, false, 1) == nil)
 assert(Rules.onboardingObjective(1, false, false, 1) == "train")
 assert(Rules.onboardingObjective(1, false, false, 2) == "gate")

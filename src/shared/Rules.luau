@@ -255,6 +255,14 @@ function Rules.speed(tier, carrying)
     return Rules.Speeds[tier] * (if carrying then Rules.CarryMultiplier else 1)
 end
 
+function Rules.nextSpeedUpgrade(tier, coins)
+    local cost = Rules.UpgradeCosts[tier]
+    if not cost then
+        return nil
+    end
+    return cost, Rules.Vaults[tier + 1], math.max(0, cost - coins)
+end
+
 function Rules.canUseVault(tier, vault)
     return tier >= vault.tier
 end

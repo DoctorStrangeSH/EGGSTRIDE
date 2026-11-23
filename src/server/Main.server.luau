@@ -1043,16 +1043,15 @@ withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)
-    local cost = Rules.UpgradeCosts[entry.tier]
+    local cost, vault, missing = Rules.nextSpeedUpgrade(entry.tier, entry.coins)
     if not cost then
         publish(player, entry, "Ты достиг максимальной скорости.")
-    elseif entry.coins < cost then
-        publish(player, entry, "Следующий уровень скорости стоит %d монет.", cost)
+    elseif missing > 0 then
+        publish(player, entry, "Для улучшения нужно ещё %d монет.", missing)
     else
         entry.coins -= cost
         entry.tier += 1
         applySpeed(player, entry)
-        local vault = Rules.Vaults[entry.tier]
         if vault then
             if playtest then
                 playtest:upgrade(player, vault.id, workspace:GetServerTimeNow())

@@ -61,8 +61,9 @@ local function sign(anchor, text)
     return label
 end
 
-local function prompt(anchor, action)
+local function prompt(anchor, action, name)
     local interaction = Instance.new("ProximityPrompt")
+    interaction.Name = name or "ProximityPrompt"
     interaction.ActionText = action
     interaction.AutoLocalize = false
     interaction:SetAttribute("SourceText", action)
@@ -420,7 +421,7 @@ function World.build(rules)
         sprout = sprout,
         prizes = prizes,
         hatch = hatch,
-        shop = prompt(shop, "Купить скорость"),
+        shop = prompt(shop, "Купить скорость", "SpeedUpgrade"),
         vaults = vaultDisplays,
     }
 end

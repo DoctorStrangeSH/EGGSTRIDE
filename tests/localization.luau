@@ -11,6 +11,8 @@ assert(Locale.text("ru", "Монеты %d  ·  Скорость %d/%d", 15, 1, 5
 assert(Locale.text("en", "Доставил: %s", "Player%2") == "Prize delivered by Player%2")
 assert(Locale.text("en", "Русский текст") == "Русский текст")
 assert(Locale.text("en", "") == "")
+assert(Locale.text("en", "Откроет %s остров", Locale.text("en", "Грозовой")) == "Unlocks Storm Island")
+assert(Locale.text("en", "%d монет · не хватает %d", 35, 3) == "35 coins · 3 short")
 assert(Locale.text("en", "Коллекция %d/%d", 18, 107) == "Collection 18/107")
 assert(Locale.text("en", "Нужен питомец «%s»", "Sun Shell") == "Requires Sun Shell")
 assert(Locale.text("en", "Скрестить: %s", "Leaftail + Dewwing") == "Breed: Leaftail + Dewwing")
