@@ -29,7 +29,8 @@ local function addLabel(parent, order, textSize)
     return label
 end
 
-function RunFeedback.connect(gui, event, rules, player)
+function RunFeedback.connect(gui, event, rules, player, locale)
+    local text = locale.text
     local tickSound = sound("Countdown", "volume_slider.ogg", 1.15, 0.30)
     local startSound = sound("GateOpen", "volume_slider.ogg", 1.65, 0.40)
     local hatchSound = sound("Hatch", "action_get_up.mp3", 1.10, 0.50)
@@ -135,25 +136,25 @@ function RunFeedback.connect(gui, event, rules, player)
                 elseif rarity == "Эпический" then Color3.fromRGB(192, 156, 255)
                 elseif rarity == "Редкий" then Color3.fromRGB(136, 208, 255)
                 else Color3.fromRGB(163, 255, 201)
-            local collection = if bonus and bonus > 0 then "\nПризовое яйцо · бонус " .. bonus
-                elseif personalBest and not rewardName then "\nЛичный рекорд · " .. rules.deliveryTimeText(personalBest)
+            local collection = if bonus and bonus > 0 then "\n" .. text("Призовое яйцо · бонус %d", bonus)
+                elseif personalBest and not rewardName then "\n" .. text("Личный рекорд · %s", locale.deliveryTime(personalBest))
                 else ""
             if rewardName then
-                collection ..= "\nНаграда · " .. rewardName
+                collection ..= "\n" .. text("Награда · %s", text(rewardName))
             end
             if materialBiome then
                 for _, vault in ipairs(rules.Vaults) do
                     if vault.id == materialBiome then
-                        collection ..= "\n" .. vault.material .. " · +1"
+                        collection ..= "\n" .. text(vault.material) .. " · +1"
                         break
                     end
                 end
             end
             if catalystBiome then
-                collection ..= "\nКатализатор · " .. catalystBiome .. " +1"
+                collection ..= "\n" .. text("Катализатор · %s +1", text(catalystBiome))
             end
             if recordXP then
-                collection ..= "\nЗадание сезона: рекорд · +" .. recordXP .. " XP"
+                collection ..= "\n" .. text("Задание сезона: рекорд · +%d XP", recordXP)
             end
             local equipped = player:GetAttribute("EquippedHatchEffect")
             local effect
@@ -163,28 +164,28 @@ function RunFeedback.connect(gui, event, rules, player)
                     break
                 end
             end
-            show(if isNew then petName .. " · новый вид" else petName,
-                string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent, effect)
+            local name = text(petName)
+            show(if isNew then text("%s · новый вид", name) else name,
+                text("%s питомец · +%d монет%s", text(rarity), coins, collection), accent, effect)
             hatchSound.PlaybackSpeed = if rarity ~= "Обычный" then 1.28 else 1.10
             play(hatchSound)
         elseif kind == "WeeklyFinish" then
             local milliseconds, isBest, result, rewardCoins = ...
             local heading = if isBest then "Личный рекорд недели" else "Забег завершён"
-            local description = rules.deliveryTimeText(milliseconds) .. " · " .. result
+            local description = locale.deliveryTime(milliseconds) .. " · " .. text(result)
             if rewardCoins then
-                description ..= "\nНаграда недели · +" .. rewardCoins .. " монет"
+                description ..= "\n" .. text("Награда недели · +%d монет", rewardCoins)
             end
-            show(heading, description, Color3.fromRGB(255, 209, 117))
+            show(text(heading), description, Color3.fromRGB(255, 209, 117))
             play(hatchSound)
         elseif kind == "WeeklyCancelled" then
-            show("Попытка отменена", "Ты вернулся в лагерь.", Color3.fromRGB(255, 209, 117))
+            show(text("Попытка отменена"), text("Ты вернулся в лагерь."), Color3.fromRGB(255, 209, 117))
         elseif kind == "WeeklyStopped" then
-            local description = ...
-            show("Забег прерван", description, Color3.fromRGB(255, 147, 137))
+            show(text("Забег прерван"), text("Попробуй ещё раз из лагеря."), Color3.fromRGB(255, 147, 137))
             play(lossSound)
         elseif kind == "Timeout" or kind == "Fall" then
             local description = if kind == "Timeout" then "Ворота закрылись. Попробуй ещё раз." else "Ты потерял яйцо при падении. Попробуй снова из лагеря."
-            show("Яйцо потеряно", description, Color3.fromRGB(255, 147, 137))
+            show(text("Яйцо потеряно"), text(description), Color3.fromRGB(255, 147, 137))
             play(lossSound)
         end
     end)

@@ -50,6 +50,9 @@ local function sign(anchor, text)
     label.TextSize = 12
     label.TextWrapped = true
     label.Text = text
+    label.AutoLocalize = false
+    label:SetAttribute("SourceText", text)
+    CollectionService:AddTag(label, "EggstrideWorldText")
     label.Parent = plate
     Instance.new("UICorner", label).CornerRadius = UDim.new(0, 6)
     local padding = Instance.new("UIPadding", label)
@@ -61,6 +64,9 @@ end
 local function prompt(anchor, action)
     local interaction = Instance.new("ProximityPrompt")
     interaction.ActionText = action
+    interaction.AutoLocalize = false
+    interaction:SetAttribute("SourceText", action)
+    CollectionService:AddTag(interaction, "EggstrideWorldText")
     interaction.MaxActivationDistance = 12
     interaction.RequiresLineOfSight = false
     interaction.Parent = anchor
@@ -159,9 +165,9 @@ function World.showWind(trail, direction, used, overrideActive)
         elseif direction == 0 then "Штиль"
         elseif direction < 0 then "Ветер к лагерю"
         else "Помоги с яйцом"
-    trail.leverLabel.Text = "Рычаг ветра\n" .. leverState
+    trail.leverLabel:SetAttribute("SourceText", "Рычаг ветра\n" .. leverState)
     for _, label in ipairs(trail.signs) do
-        label.Text = "Ветровая тропа\n" .. description
+        label:SetAttribute("SourceText", "Ветровая тропа\n" .. description)
     end
     local rotation = if direction < 0 then math.pi else 0
     for _, arrow in ipairs(trail.arrows) do

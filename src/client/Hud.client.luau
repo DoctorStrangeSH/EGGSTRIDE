@@ -3,6 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
+local locale = require(script.Parent.InterfaceLanguage)
+local text = locale.text
 local round = shared:WaitForChild("Round")
 local cancelWeekly = shared:WaitForChild("CancelWeekly")
 local RunFeedback = require(script.Parent:WaitForChild("RunFeedback"))
@@ -31,6 +33,7 @@ local colors = {
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "EggstrideHud"
+gui.AutoLocalize = false
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 
@@ -87,7 +90,7 @@ local objective = label(panel, "Objective", 2, 13, colors.mint)
 local notice = label(panel, "Notice", 3, 12, colors.white)
 
 gui.Parent = player:WaitForChild("PlayerGui")
-local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"), Rules, player)
+local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"), Rules, player, locale)
 
 local runOpen = false
 local guide = Instance.new("Highlight")
@@ -130,7 +133,7 @@ exitControls.Parent = panel
 local function exitButton(parent, name, caption, position, size, background, foreground)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Text = caption
+    button.Text = text(caption)
     button.Position = position
     button.Size = size
     button.TextWrapped = true
@@ -203,13 +206,13 @@ local function update()
     local abilityId = player:GetAttribute("EggAbility")
     local ability = Rules.Abilities[abilityId]
     local tier = player:GetAttribute("SpeedTier") or 1
-    stats.Text = string.format("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
-    local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm")
-        elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber")
-        else round:GetAttribute("PrizeStatus_meadow") or "Луговое яйцо доступно каждому"
-    objective.Text = if carrying and ability then ability.hint
-        elseif carrying then "К инкубатору"
-        elseif player:GetAttribute("Delivered") then "Яйцо спасено"
+    stats.Text = text("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
+    local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm_" .. locale.language)
+        elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber_" .. locale.language)
+        else round:GetAttribute("PrizeStatus_meadow_" .. locale.language) or text("Луговое яйцо доступно каждому")
+    objective.Text = if carrying and ability then text(ability.hint)
+        elseif carrying then text("К инкубатору")
+        elseif player:GetAttribute("Delivered") then text("Яйцо спасено")
         else prizeStatus or ""
     local step = player:GetAttribute("OnboardingStep")
     local target
@@ -218,17 +221,17 @@ local function update()
         target = if shortcut then shortcut.Value else hatchTarget.Value
     elseif (step == 1 or step == 2) and not player:GetAttribute("Delivered") then
         if runOpen then
-            objective.Text = "Забери яйцо на Луговом острове"
+            objective.Text = text("Забери яйцо на Луговом острове")
             target = eggTarget.Value
         elseif tier == 1 then
-            objective.Text = "Купи скорость за " .. Rules.UpgradeCosts[1] .. " монет"
+            objective.Text = text("Купи скорость за %d монет", Rules.UpgradeCosts[1])
             target = trainingTarget.Value
         else
-            objective.Text = "Дождись старта у ворот"
+            objective.Text = text("Дождись старта у ворот")
             target = gateTarget.Value
         end
     elseif step == 3 and not carrying then
-        objective.Text = "Открой коллекцию питомцев"
+        objective.Text = text("Открой коллекцию питомцев")
     end
     local weeklyStart = player:GetAttribute("WeeklyStartsAt")
     if exitAttempt and exitAttempt ~= weeklyStart then
@@ -238,12 +241,12 @@ local function update()
     local weeklyStep = player:GetAttribute("WeeklyStep")
     local weeklyPoint = weeklyTargets[Rules.Weekly.order[weeklyStep]]
     if weeklyPoint then
-        objective.Text = Rules.Weekly.labels[weeklyStep]
-        stats.Text = string.format("Этап %d/%d", weeklyStep, #Rules.Weekly.order)
+        objective.Text = text(Rules.Weekly.labels[weeklyStep])
+        stats.Text = text("Этап %d/%d", weeklyStep, #Rules.Weekly.order)
         target = weeklyPoint.Value
     elseif weeklyStart then
-        stats.Text = "Скорость " .. Rules.Weekly.tier .. " у всех"
-        objective.Text = "Пройди метки и верни яйцо"
+        stats.Text = text("Скорость %d у всех", Rules.Weekly.tier)
+        objective.Text = text("Пройди метки и верни яйцо")
         target = nil
     end
     waypoint.Adornee = if weeklyPoint then target else nil
@@ -260,7 +263,7 @@ for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText"
     player:GetAttributeChangedSignal(name):Connect(updateNotice)
 end
 for _, definition in ipairs(Rules.Prizes) do
-    round:GetAttributeChangedSignal("PrizeStatus_" .. definition.id):Connect(update)
+    round:GetAttributeChangedSignal("PrizeStatus_" .. definition.id .. "_" .. locale.language):Connect(update)
 end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget, trainingTarget, abilityTargets.vine, abilityTargets.relay }) do
     target:GetPropertyChangedSignal("Value"):Connect(update)
@@ -281,18 +284,18 @@ while true do
         end
         local closing = open and left <= 5
         local phase = if closing then "Ворота закроются" elseif open then "Забег" else "Подготовка"
-        timer.Text = string.format("%s  ·  %02d сек", phase, left)
+        timer.Text = text("%s  ·  %02d сек", text(phase), left)
         timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
         updateFeedback(open, left, player:GetAttribute("CarryingEgg") == true, weeklyStart ~= nil)
     end
     local endsAt = player:GetAttribute("WeeklyEndsAt")
     if endsAt then
         local left = math.max(0, math.ceil(endsAt - workspace:GetServerTimeNow()))
-        timer.Text = string.format("Забег недели  ·  %02d сек", left)
+        timer.Text = text("%s  ·  %02d сек", text("Забег недели"), left)
         timer.TextColor3 = if left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
     elseif weeklyStart then
         local left = math.max(1, math.ceil(weeklyStart - workspace:GetServerTimeNow()))
-        timer.Text = string.format("Старт через %d", left)
+        timer.Text = text("Старт через %d", left)
         timer.TextColor3 = colors.gold
     end
     updateGuide()

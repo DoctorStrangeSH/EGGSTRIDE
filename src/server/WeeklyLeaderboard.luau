@@ -7,7 +7,7 @@ WeeklyLeaderboard.__index = WeeklyLeaderboard
 
 local PAGE_SIZE = 10
 
-function WeeklyLeaderboard.new(round, rules)
+function WeeklyLeaderboard.new(round, rules, locale)
     local feed = Instance.new("StringValue")
     feed.Name = "WeeklyLeaderboard"
     feed.Value = "Загружаем результаты…"
@@ -20,7 +20,7 @@ function WeeklyLeaderboard.new(round, rules)
     end
     feed:SetAttribute("SessionOnly", storeName == nil)
     return setmetatable({
-        feed = feed, rules = rules, storeName = storeName, names = {}, results = {},
+        feed = feed, rules = rules, locale = locale, storeName = storeName, names = {}, results = {},
         week = nil, refreshing = false, nextRefreshAt = 0,
     }, WeeklyLeaderboard)
 end
@@ -32,7 +32,7 @@ end
 function WeeklyLeaderboard:show(results)
     local lines = {}
     for index, result in ipairs(results) do
-        table.insert(lines, string.format("%d. %s  ·  %s", index, result.name, self.rules.deliveryTimeText(result.time)))
+        table.insert(lines, string.format("%d. %s  ·  %s", index, result.name, self.locale.deliveryTime("ru", result.time)))
     end
     self.feed.Value = if #lines > 0 then table.concat(lines, "\n") else "Пока нет результатов"
 end

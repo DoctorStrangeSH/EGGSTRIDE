@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
+local Locale = require(Shared.Locale)
 local World = require(script.Parent.World)
 local Loot = require(script.Parent.Loot)
 local Season = require(script.Parent.Season)
@@ -15,6 +16,15 @@ local Profile = require(script.Parent.Profile)
 local ProfileStore = require(script.Parent.ProfileStore)
 local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
 
+local inStudio = RunService:IsStudio()
+local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
+local function languageFor(player)
+    return Locale.language(if type(studioLanguage) == "string" then studioLanguage else player.LocaleId)
+end
+
+local function translate(player, source, ...)
+    return Locale.text(languageFor(player), source, ...)
+end
 local petCatalog = {}
 for _, vault in ipairs(Rules.Vaults) do
     for _, pet in ipairs(vault.pets) do
@@ -67,7 +77,7 @@ for name, part in pairs(targets) do
     marker.Value = part
     marker.Parent = round
 end
-local weeklyLeaderboard = WeeklyLeaderboard.new(round, Rules)
+local weeklyLeaderboard = WeeklyLeaderboard.new(round, Rules, Locale)
 round.Parent = Shared
 
 local equipPet = Instance.new("RemoteEvent")
@@ -112,19 +122,22 @@ local closing = false
 local pending = 0
 local prizes = {}
 
-local function showPrize(definition, available, status)
+local function showPrize(definition, available, source, argument, translateArgument)
     World.showPrize(map.prizes[definition.id], available)
-    round:SetAttribute("PrizeStatus_" .. definition.id, status)
+    for _, language in ipairs({ "ru", "en" }) do
+        local status = if argument == nil then source else Locale.text(language, source,
+            if translateArgument then Locale.text(language, argument) else argument)
+        round:SetAttribute("PrizeStatus_" .. definition.id .. "_" .. language, status)
+    end
 end
 
 local function releasePrize(player, entry)
     local definition = entry.prize
     if definition and RoundPrize.release(prizes[definition.id], player) then
-        showPrize(definition, true, definition.name .. " снова на пьедестале")
+        showPrize(definition, true, "%s снова на пьедестале", definition.name, true)
     end
     entry.prize = nil
 end
-local inStudio = RunService:IsStudio()
 local previewSeasonPass = inStudio and workspace:GetAttribute("UseStudioDataStore") ~= true
 local configuredPassId = workspace:GetAttribute("SeasonPassId")
 local seasonPassId = if type(configuredPassId) == "number" and configuredPassId > 0
@@ -215,7 +228,7 @@ local function applySpeed(player, entry)
     end
 end
 
-local function publish(player, entry, message)
+local function publish(player, entry, message, ...)
     player:SetAttribute("OnboardingStep", entry.onboarding)
     player:SetAttribute("StormTrailUnlocked", entry.stormTrailUnlocked)
     player:SetAttribute("Coins", entry.coins)
@@ -227,7 +240,7 @@ local function publish(player, entry, message)
     player:SetAttribute("Delivered", entry.delivered)
     if message then
         player:SetAttribute("NoticeUntil", workspace:GetServerTimeNow() + 5)
-        player:SetAttribute("Notice", message)
+        player:SetAttribute("Notice", translate(player, message, ...))
     end
 end
 
@@ -407,7 +420,7 @@ local function join(player)
     loading[player] = load
     pending += 1
     player.RespawnLocation = map.spawn
-    player:SetAttribute("Notice", "Загружаем прогресс…")
+    player:SetAttribute("Notice", translate(player, "Загружаем прогресс…"))
     local function canContinue()
         return not closing and not load.cancelled and player.Parent == Players
     end
@@ -418,7 +431,7 @@ local function join(player)
             ProfileStore.save(session, record, true)
         elseif canContinue() then
             warn("EGGSTRIDE: profile load failed", player.UserId, reason)
-            player:Kick("Не удалось загрузить прогресс. Попробуй зайти чуть позже.")
+            player:Kick(translate(player, "Не удалось загрузить прогресс. Попробуй зайти чуть позже."))
         end
         pending -= 1
         return
@@ -512,7 +525,7 @@ local function join(player)
             if entry.weekly then
                 stopWeekly(player, entry)
                 publish(player, entry, "")
-                runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")
+                runFeedback:FireClient(player, "WeeklyStopped")
             end
             local lost = entry.egg ~= nil
             clearEgg(player, entry)
@@ -604,6 +617,7 @@ local function updateWind(player, entry, humanoid, root, now, open)
         entry.windFactor = factor
         applySpeed(player, entry)
     end
+    effect = if effect then translate(player, effect) else nil
     if player:GetAttribute("WindEffect") ~= effect then
         player:SetAttribute("WindEffect", effect)
     end
@@ -658,7 +672,7 @@ local function finishWeekly(player, entry, root, now, week, completed)
     returnFromWeekly(player, entry, root)
     if not completed then
         publish(player, entry, "")
-        runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")
+        runFeedback:FireClient(player, "WeeklyStopped")
         return
     end
 
@@ -715,7 +729,7 @@ local function hatch(player, entry, root, secondsLeft, now, week)
     local awardedPrize = definition and RoundPrize.deliver(prizes[definition.id], player)
     if awardedPrize then
         bonus = definition.bonus
-        showPrize(definition, false, "Доставил: " .. player.DisplayName)
+        showPrize(definition, false, "Доставил: %s", player.DisplayName)
     end
     local routeCompleted = entry.routeStage == 2
     local catalystAwarded = Profile.awardCatalyst(entry, vault, entry.routeStage)
@@ -787,7 +801,7 @@ local function syncRound()
         wasOpen = open
         if open then
             for _, definition in ipairs(Rules.Prizes) do
-                showPrize(definition, true, "Приз на " .. definition.location)
+                showPrize(definition, true, "Приз на %s", definition.location, true)
             end
         end
         map.gate.CanCollide = not open
@@ -849,7 +863,7 @@ local function syncRound()
                         end
                         local reference = attempt.rankable and attempt.referenceSplits
                         player:SetAttribute("WeeklySplitText",
-                            Rules.weeklySplitText(splitTime, reference and reference[attempt.step]))
+                            Locale.weeklySplit(languageFor(player), splitTime, reference and reference[attempt.step]))
                         attempt.step += 1
                         player:SetAttribute("WeeklyStep", attempt.step)
                     end
@@ -929,7 +943,7 @@ local function pickUp(player, entry, root, vaultIndex, definition)
             return
         end
         entry.prize = definition
-        showPrize(definition, false, player.DisplayName .. " забрал приз")
+        showPrize(definition, false, "%s забрал приз", player.DisplayName)
     end
     entry.egg = if definition then prizeEggs[definition.id] else roundEggs[vaultIndex]
     entry.pickupAt = now
@@ -989,7 +1003,7 @@ withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
     windSwitchEndsAt = workspace:GetServerTimeNow() + Rules.WindSwitch.duration
     windDirection = -1
     showWind()
-    publish(player, entry, "Ты развернул ветер на " .. Rules.WindSwitch.duration .. " сек.")
+    publish(player, entry, "Ты развернул ветер на %d сек.", Rules.WindSwitch.duration)
     publish(carrier, entries[carrier], "Ветер развернули. Беги домой по короткой тропе!")
 end)
 
@@ -998,14 +1012,17 @@ withNearbyPlayer(map.shop, function(player, entry)
     if not cost then
         publish(player, entry, "Ты достиг максимальной скорости.")
     elseif entry.coins < cost then
-        publish(player, entry, "Следующий уровень скорости стоит " .. cost .. " монет.")
+        publish(player, entry, "Следующий уровень скорости стоит %d монет.", cost)
     else
         entry.coins -= cost
         entry.tier += 1
         applySpeed(player, entry)
         local vault = Rules.Vaults[entry.tier]
-        publish(player, entry, if vault then "Открыт " .. vault.name .. " остров"
-            else "Скорость повышена до уровня " .. entry.tier .. ".")
+        if vault then
+            publish(player, entry, "Открыт %s остров", translate(player, vault.name))
+        else
+            publish(player, entry, "Скорость повышена до уровня %d.", entry.tier)
+        end
     end
 end)
 
@@ -1074,7 +1091,7 @@ mutatePet.OnServerEvent:Connect(function(player, petId)
         local vaultId = mutation.vault.id
         player:SetAttribute("OwnsPet_" .. petId, true)
         player:SetAttribute("Catalyst_" .. vaultId, entry.catalysts[vaultId])
-        publish(player, entry, "Новая форма: " .. mutation.pet.name .. ".")
+        publish(player, entry, "Новая форма: %s.", translate(player, mutation.pet.name))
     end
 end)
 
@@ -1147,7 +1164,7 @@ claimSeason.OnServerEvent:Connect(function(player, index, premium)
         publishBiomeProgress(player, entry, reward.material)
     end
     publishSeason(player, entry)
-    publish(player, entry, "Награда сезона: " .. reward.label .. ".")
+    publish(player, entry, "Награда сезона: %s.", translate(player, reward.label))
 end)
 
 equipPet.OnServerEvent:Connect(function(player, petId)
@@ -1170,7 +1187,7 @@ equipPet.OnServerEvent:Connect(function(player, petId)
     if humanoid and humanoid.Health > 0 and root then
         showPet(root, pet, entry.stormTrailUnlocked)
     end
-    publish(player, entry, "Спутник выбран: " .. pet.name .. ".")
+    publish(player, entry, "Спутник выбран: %s.", translate(player, pet.name))
 end)
 
 syncRound()
@@ -1210,7 +1227,7 @@ task.spawn(function()
                 end
                 warn("EGGSTRIDE: autosave failed", player.UserId, reason)
                 if reason == "lost" or ProfileStore.expired(entry.session) then
-                    player:Kick("Сохранение больше недоступно. Перезайди, чтобы продолжить.")
+                    player:Kick(translate(player, "Сохранение больше недоступно. Перезайди, чтобы продолжить."))
                 end
             end)
         end

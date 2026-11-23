@@ -12,6 +12,8 @@ local seasonPass = shared:WaitForChild("SeasonPass")
 local cosmeticShop = shared:WaitForChild("CosmeticShop")
 local HatchEffects = require(script.Parent.HatchEffects)
 local CampThemes = require(script.Parent.CampThemes)
+local locale = require(script.Parent.InterfaceLanguage)
+local Locale = require(shared:WaitForChild("Locale"))
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -49,7 +51,8 @@ local playerGui = player:WaitForChild("PlayerGui")
 gui.Parent = playerGui
 
 local header = playerGui:WaitForChild("EggstrideHud"):WaitForChild("Status"):WaitForChild("Header")
-local open = textItem("TextButton", header, "Питомцы", 13, palette.panel)
+local open = textItem("TextButton", header, locale.text("Питомцы"), 13, palette.panel)
+open.AutoLocalize = false
 open.AnchorPoint = Vector2.new(1, 0)
 open.Position = UDim2.fromScale(1, 0)
 open.Size = UDim2.fromOffset(102, 44)
@@ -391,7 +394,7 @@ local function updateSeason()
         for _, vault in ipairs(Rules.Vaults) do
             local best = player:GetAttribute("SeasonDeliveryBest_" .. vault.id)
             if best then
-                table.insert(times, vault.name .. " · " .. Rules.deliveryTimeText(best))
+                table.insert(times, vault.name .. " · " .. Locale.deliveryTime("ru", best))
             end
         end
         table.insert(lines, if #times > 0 then "Лучшие доставки недели\n" .. table.concat(times, "\n")
@@ -644,7 +647,7 @@ local function updateProgress()
         local record = player:GetAttribute("DeliveryRecord_" .. vault.id)
         local heading = string.format("%s · доставок %d", vault.name, deliveries)
         if record then
-            heading ..= " · рекорд " .. Rules.deliveryTimeText(record)
+            heading ..= " · рекорд " .. Locale.deliveryTime("ru", record)
         end
         table.insert(sections, heading .. "\n" .. string.format("%s · %d", vault.material, materials))
     end
@@ -793,7 +796,7 @@ end
 update = function()
     local equipped = player:GetAttribute("EquippedPetId")
     local time = player:GetAttribute("WeeklyBest")
-    local heading = if time then "Рекорд недели · " .. Rules.deliveryTimeText(time)
+    local heading = if time then "Рекорд недели · " .. Locale.deliveryTime("ru", time)
         else "Забег недели · вход в лагере"
     local reward = if player:GetAttribute("WeeklyRewardClaimed") then "Награда недели получена"
         else string.format("Награда: %d монет за зачётный финиш ≤ %d сек.",
