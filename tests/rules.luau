@@ -119,6 +119,17 @@ for _ in pairs(petIds) do
     total += 1
 end
 assert(total == 100)
+for index, mutation in ipairs(Rules.Mutations) do
+    assert(mutation.vault == Rules.Vaults[index] and byOffspring[mutation.parent.id])
+    assert(not petIds[mutation.pet.id] and mutation.cost == 2 and mutation.pet.mutated)
+    petIds[mutation.pet.id] = true
+end
+assert(Rules.returnBridgeStage(0, -0.4) == 0)
+assert(Rules.returnBridgeStage(0, 0.25) == 1)
+assert(Rules.returnBridgeStage(1, 0) == 1)
+assert(Rules.returnBridgeStage(1, -0.25) == 2)
+assert(Rules.returnBridgeStage(2, 0.5) == 2)
+
 
 assert(Rules.onboardingAfterPickup(1) == 2)
 assert(Rules.onboardingAfterPickup(2) == 2)

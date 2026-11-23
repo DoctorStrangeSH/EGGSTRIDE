@@ -22,6 +22,10 @@ for id, recipe in pairs(byOffspring) do
     catalog[id] = recipe.offspring
 end
 
+for _, mutation in ipairs(Rules.Mutations) do
+    catalog[mutation.pet.id] = mutation.pet
+end
+
 local defaults = Profile.new(Rules.StartCoins)
 assert(defaults.tier == 1 and defaults.coins == Rules.StartCoins and not next(defaults.owned) and defaults.onboarding == 0 and not defaults.stormTrailUnlocked)
 
@@ -35,7 +39,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 
 local pet = catalog.dew_moth
 local entry = {
-    deliveries = {}, prizeWins = {}, materials = {}, discoveries = {},
+    deliveries = {}, prizeWins = {}, materials = {}, discoveries = {}, catalysts = {},
     coins = 77, tier = 2, weeklyRewardWeek = 20, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
     onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200, rankedSplits = { 2000, 4500, 6500, 9000, 12000, 15200 } }, delivered = true, egg = Loot.eggForRoll(1, 1),
 }
@@ -186,5 +190,33 @@ assert(Nursery.find(byPair, "leaf_tail", "dew_moth") == recipe)
 assert(Nursery.find(byPair, "dew_moth", "leaf_tail") == recipe)
 assert(not Nursery.find(byPair, "leaf_tail", "amber_crab"))
 assert(not Nursery.find(byPair, "leaf_tail", "clover_hare"))
+
+local mutation = Rules.Mutations[1]
+local vault = mutation.vault
+assert(not next(legacyNursery.catalysts))
+assert(not Profile.awardCatalyst(entry, vault, 0) and not Profile.awardCatalyst(entry, vault, 1))
+assert(not Profile.awardCatalyst(entry, vault, nil) and not next(entry.catalysts))
+assert(Profile.awardCatalyst(entry, Rules.Vaults[2], 2))
+assert(not Profile.mutatePet(entry, mutation))
+assert(entry.catalysts.amber == 1)
+
+assert(Profile.awardCatalyst(entry, vault, 2) and not Profile.mutatePet(entry, mutation))
+assert(Profile.awardCatalyst(entry, vault, 2))
+entry.ownedPets[mutation.parent.id] = nil
+assert(not Profile.mutatePet(entry, mutation) and entry.catalysts.meadow == 2)
+entry.ownedPets[mutation.parent.id] = mutation.parent
+assert(Profile.mutatePet(entry, mutation))
+assert(entry.ownedPets[mutation.parent.id] and entry.ownedPets[mutation.pet.id] and entry.catalysts.meadow == 0)
+assert(Profile.awardCatalyst(entry, vault, 2) and Profile.awardCatalyst(entry, vault, 2))
+assert(not Profile.mutatePet(entry, mutation) and entry.catalysts.meadow == 2)
+entry.pet = mutation.pet
+local mutationSnapshot = Profile.snapshot(entry)
+mutationSnapshot.catalysts.storm = -1
+mutationSnapshot.catalysts.unknown = 5
+local mutationSave = Profile.write(opened, mutationSnapshot, "server_a", 190, true)
+local mutationProfile = Profile.acquire(mutationSave, "server_f", 191, catalog, Rules)
+assert(mutationProfile.equipped == mutation.pet.id and mutationProfile.owned[mutation.parent.id])
+assert(mutationProfile.catalysts.meadow == 2 and mutationProfile.catalysts.amber == 1)
+assert(not mutationProfile.catalysts.storm and not mutationProfile.catalysts.unknown)
 
 print("Eggstride profiles: OK")

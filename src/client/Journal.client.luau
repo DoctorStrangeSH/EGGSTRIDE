@@ -5,6 +5,7 @@ local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
 local equipPet = shared:WaitForChild("EquipPet")
 local breedPet = shared:WaitForChild("BreedPet")
+local mutatePet = shared:WaitForChild("MutatePet")
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -176,6 +177,62 @@ local function menuButton(caption, order)
     fill(button, palette.gold, 10)
     return button
 end
+
+local mutationsButton = menuButton("Мутации  +", -20)
+local mutationCards = {}
+local mutationsExpanded = false
+
+for index, mutation in ipairs(Rules.Mutations) do
+    local order = mutationsButton.LayoutOrder + index * 2
+    local info = description("Mutation_" .. mutation.pet.id, order - 1, palette.text)
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    local action = menuButton("", order)
+    info.Visible = false
+    action.Visible = false
+    table.insert(mutationCards, { info = info, action = action })
+
+    local stockAttribute = "Catalyst_" .. mutation.vault.id
+    local parentAttribute = "OwnsPet_" .. mutation.parent.id
+    local ownedAttribute = "OwnsPet_" .. mutation.pet.id
+    local function updateMutation()
+        local stock = player:GetAttribute(stockAttribute)
+        local owned = player:GetAttribute(ownedAttribute) == true
+        local hasParent = player:GetAttribute(parentAttribute) == true
+        local canMutate = not owned and hasParent and stock ~= nil and stock >= mutation.cost
+        info.Text = mutation.pet.name .. "\n" .. mutation.appearance
+        if not owned then
+            info.Text ..= "\n" .. mutation.route .. "\n"
+                .. string.format("Катализаторы · %d/%d", stock or 0, mutation.cost)
+        end
+        action.Text = if owned then "В коллекции"
+            elseif not hasParent then "Нужен питомец «" .. mutation.parent.name .. "»"
+            elseif not canMutate then "Нужны катализаторы"
+            else "Открыть форму"
+        action.Active = canMutate
+        action.Selectable = canMutate
+        action.AutoButtonColor = canMutate
+        action.BackgroundColor3 = if owned then palette.mint elseif canMutate then palette.gold else palette.muted
+    end
+
+    for _, attribute in ipairs({ stockAttribute, parentAttribute, ownedAttribute }) do
+        player:GetAttributeChangedSignal(attribute):Connect(updateMutation)
+    end
+    action.Activated:Connect(function()
+        if action.Active then
+            mutatePet:FireServer(mutation.pet.id)
+        end
+    end)
+    updateMutation()
+end
+
+mutationsButton.Activated:Connect(function()
+    mutationsExpanded = not mutationsExpanded
+    mutationsButton.Text = if mutationsExpanded then "Мутации  −" else "Мутации  +"
+    for _, card in ipairs(mutationCards) do
+        card.info.Visible = mutationsExpanded
+        card.action.Visible = mutationsExpanded
+    end
+end)
 
 local nurseryButton = menuButton("Питомник  +", -12)
 local biomeButton = menuButton("", -11)
@@ -455,6 +512,7 @@ for index, vault in ipairs(Rules.Vaults) do
     for _, pet in ipairs(Rules.Offspring[index]) do
         addPetRow(group, pet, "Питомник", true)
     end
+    addPetRow(group, Rules.Mutations[index].pet, "Мутация", false)
 end
 
 update = function()

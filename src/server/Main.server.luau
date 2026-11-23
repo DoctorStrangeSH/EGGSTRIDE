@@ -30,6 +30,12 @@ for offspringId, recipe in pairs(recipesByOffspring) do
     petCatalog[offspringId] = recipe.offspring
 end
 
+local mutationsByPet = {}
+for _, mutation in ipairs(Rules.Mutations) do
+    petCatalog[mutation.pet.id] = mutation.pet
+    mutationsByPet[mutation.pet.id] = mutation
+end
+
 local weeklyGroup = "EggstrideWeeklyRunners"
 if not workspace:IsCollisionGroupRegistered(weeklyGroup) then
     workspace:RegisterCollisionGroup(weeklyGroup)
@@ -64,6 +70,10 @@ equipPet.Parent = Shared
 local breedPet = Instance.new("RemoteEvent")
 breedPet.Name = "BreedPet"
 breedPet.Parent = Shared
+
+local mutatePet = Instance.new("RemoteEvent")
+mutatePet.Name = "MutatePet"
+mutatePet.Parent = Shared
 
 local runFeedback = Instance.new("RemoteEvent")
 runFeedback.Name = "RunFeedback"
@@ -179,6 +189,7 @@ end
 local function publishBiomeProgress(player, entry, vaultId)
     player:SetAttribute("Deliveries_" .. vaultId, entry.deliveries[vaultId] or 0)
     player:SetAttribute("Material_" .. vaultId, entry.materials[vaultId] or 0)
+    player:SetAttribute("Catalyst_" .. vaultId, entry.catalysts[vaultId] or 0)
 end
 
 local function accessory(root, name, color, size, offset)
@@ -239,6 +250,16 @@ local function showPet(root, pet, stormTrailUnlocked)
     elseif pet.form == "spring" then
         accessory(body, "Pom", trim, Vector3.new(0.72, 0.72, 0.72), Vector3.new(0, 0.31, 1.04))
     end
+    if pet.mutated then
+        local marking = accessory(body, "MutationMark", trim,
+            Vector3.new(0.42, 0.38, 0.23), Vector3.new(0, 0.51, -0.7))
+        marking.Material = Enum.Material.Neon
+        local light = Instance.new("PointLight")
+        light.Color = trim
+        light.Brightness = 0.55
+        light.Range = 5
+        light.Parent = marking
+    end
     if stormTrailUnlocked then
         local top = Instance.new("Attachment")
         top.Position = Vector3.new(0, 0.35, 0.5)
@@ -263,6 +284,7 @@ local function clearEgg(player, entry)
     entry.eggVault = nil
     entry.pickupAt = nil
     entry.abilityUsed = false
+    entry.routeStage = 0
     entry.windFactor = nil
     entry.windPosition = nil
     entry.windSampleAt = nil
@@ -336,6 +358,8 @@ local function join(player)
         deliveries = record.deliveries,
         prizeWins = record.prizeWins,
         materials = record.materials,
+        catalysts = record.catalysts,
+        routeStage = 0,
         discoveries = record.discoveries,
         weeklyRecord = record.weeklyRecord,
         weeklyRewardWeek = record.weeklyRewardWeek,
@@ -345,6 +369,7 @@ local function join(player)
         ownedPets = {},
         nextEquipAt = 0,
         nextBreedAt = 0,
+        nextMutationAt = 0,
     }
     for id in pairs(record.owned) do
         entry.ownedPets[id] = petCatalog[id]
@@ -451,6 +476,11 @@ local function onBridge(root, bridge)
         and delta.Y >= 0 and delta.Y <= 9
 end
 
+local function trackReturnBridge(entry, root, bridge)
+    local relativeX = (root.Position.X - bridge.Position.X) / bridge.Size.X
+    entry.routeStage = Rules.returnBridgeStage(entry.routeStage, relativeX)
+end
+
 local function updateWind(player, entry, humanoid, root, now, open)
     local factor = 1
     local effect
@@ -464,6 +494,9 @@ local function updateWind(player, entry, humanoid, root, now, open)
             entry.windSampleAt = now
             entry.windPosition = root.Position.X
             local anchor = entry.egg and entry.egg.ability == "anchor" and paceX < -1
+            if anchor then
+                trackReturnBridge(entry, root, map.windTrail.part)
+            end
             factor = if anchor then Rules.WindTailwind else Rules.windFactor(windDirection, paceX)
             effect = if anchor then "Якорь ускоряет бег" elseif factor > 1 then "Попутный ветер"
                 elseif factor < 1 then "Встречный ветер" else nil
@@ -473,6 +506,9 @@ local function updateWind(player, entry, humanoid, root, now, open)
             if vineEndsAt and entry.egg and entry.egg.ability == "vine" and onBridge(root, map.vine) then
                 factor = Rules.WindTailwind
                 effect = "Лиана ускоряет бег"
+                trackReturnBridge(entry, root, map.vine)
+            elseif entry.routeStage == 1 then
+                entry.routeStage = 0
             end
         end
     end
@@ -497,6 +533,7 @@ local function updateAbility(player, entry, root, now)
         publish(player, entry, "Мост открыт. Беги по лиане.")
     elseif ability == "relay" and (root.Position - map.stormRelay.origin.Position).Magnitude <= 7 then
         entry.abilityUsed = true
+        entry.routeStage = 2
         player.Character:PivotTo(map.stormRelay.destination)
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
@@ -588,6 +625,7 @@ local function hatch(player, entry, root, secondsLeft, now)
         bonus = definition.bonus
         showPrize(definition, false, "Доставил: " .. player.DisplayName)
     end
+    local catalystAwarded = Profile.awardCatalyst(entry, vault, entry.routeStage)
     clearEgg(player, entry)
     entry.delivered = true
     entry.coins += vault.coins + bonus
@@ -611,7 +649,7 @@ local function hatch(player, entry, root, secondsLeft, now)
     publish(player, entry, "")
     runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins + bonus, isNew,
         if unlockedTrail then Rules.StormTrial.name else nil, personalBest, bonus,
-        if materialGain > 0 then vault.id else nil)
+        if materialGain > 0 then vault.id else nil, if catalystAwarded then vault.name else nil)
 end
 
 local function syncRound()
@@ -912,6 +950,27 @@ breedPet.OnServerEvent:Connect(function(player, firstId, secondId)
         breedPet:FireClient(player, firstId, secondId, "found", offspring.name)
     else
         breedPet:FireClient(player, firstId, secondId, "materials")
+    end
+end)
+
+mutatePet.OnServerEvent:Connect(function(player, petId)
+    local entry = entries[player]
+    if closing or not entry or entry.weekly or ProfileStore.expired(entry.session)
+        or typeof(petId) ~= "string" or #petId > 32 then
+        return
+    end
+    local now = os.clock()
+    if now < entry.nextMutationAt then
+        return
+    end
+    entry.nextMutationAt = now + 0.25
+
+    local mutation = mutationsByPet[petId]
+    if mutation and Profile.mutatePet(entry, mutation) then
+        local vaultId = mutation.vault.id
+        player:SetAttribute("OwnsPet_" .. petId, true)
+        player:SetAttribute("Catalyst_" .. vaultId, entry.catalysts[vaultId])
+        publish(player, entry, "Новая форма: " .. mutation.pet.name .. ".")
     end
 end)
 

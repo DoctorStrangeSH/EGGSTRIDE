@@ -9,7 +9,7 @@ function Profile.new(startCoins)
         version = Profile.VERSION, coins = startCoins, tier = 1, owned = {},
         equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
         muteRunSounds = false, reduceCardMotion = false,
-        deliveries = {}, prizeWins = {}, materials = {}, discoveries = {},
+        deliveries = {}, prizeWins = {}, materials = {}, discoveries = {}, catalysts = {},
     }
 end
 
@@ -71,6 +71,26 @@ function Profile.breed(entry, recipe)
     return true
 end
 
+function Profile.awardCatalyst(entry, vault, routeStage)
+    if routeStage ~= 2 or (entry.catalysts[vault.id] or 0) >= MAX_COUNTER then
+        return false
+    end
+    increment(entry.catalysts, vault.id)
+    return true
+end
+
+function Profile.mutatePet(entry, mutation)
+    local id = mutation.vault.id
+    local stock = entry.catalysts[id] or 0
+    if not entry.ownedPets[mutation.parent.id] or entry.ownedPets[mutation.pet.id]
+        or stock < mutation.cost then
+        return false
+    end
+    entry.catalysts[id] = stock - mutation.cost
+    entry.ownedPets[mutation.pet.id] = mutation.pet
+    return true
+end
+
 function Profile.read(stored, catalog, rules)
     if type(stored) ~= "table" or stored.version ~= Profile.VERSION
         or not wholeNumber(stored.coins, 0, 9e15) or not wholeNumber(stored.tier, 1, #rules.Speeds)
@@ -83,6 +103,7 @@ function Profile.read(stored, catalog, rules)
     record.deliveries = readCounts(stored.deliveries, rules.Vaults)
     record.prizeWins = readCounts(stored.prizeWins, rules.Prizes)
     record.materials = readCounts(stored.materials, rules.Vaults)
+    record.catalysts = readCounts(stored.catalysts, rules.Vaults)
     record.muteRunSounds = stored.muteRunSounds == true
     record.reduceCardMotion = stored.reduceCardMotion == true
     record.stormTrailUnlocked = stored.stormTrailUnlocked == true
@@ -156,6 +177,7 @@ function Profile.snapshot(entry)
     record.deliveries = table.clone(entry.deliveries)
     record.prizeWins = table.clone(entry.prizeWins)
     record.materials = table.clone(entry.materials)
+    record.catalysts = table.clone(entry.catalysts)
     record.discoveries = table.clone(entry.discoveries)
     record.weeklyRecord = entry.weeklyRecord
     record.weeklyRewardWeek = entry.weeklyRewardWeek

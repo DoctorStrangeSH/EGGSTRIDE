@@ -113,7 +113,7 @@ function RunFeedback.connect(gui, event, rules, player)
 
     event.OnClientEvent:Connect(function(kind, ...)
         if kind == "Hatch" then
-            local petName, rarity, coins, isNew, rewardName, personalBest, bonus, materialBiome = ...
+            local petName, rarity, coins, isNew, rewardName, personalBest, bonus, materialBiome, catalystBiome = ...
             local accent = if rarity == "Мифический" then Color3.fromRGB(242, 159, 255)
                 elseif rarity == "Легендарный" then Color3.fromRGB(255, 196, 86)
                 elseif rarity == "Эпический" then Color3.fromRGB(192, 156, 255)
@@ -132,6 +132,9 @@ function RunFeedback.connect(gui, event, rules, player)
                         break
                     end
                 end
+            end
+            if catalystBiome then
+                collection ..= "\nКатализатор · " .. catalystBiome .. " +1"
             end
             show(if isNew then petName .. " · новый вид" else petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
             hatchSound.PlaybackSpeed = if rarity ~= "Обычный" then 1.28 else 1.10

@@ -161,6 +161,30 @@ Rules.Offspring = {
     },
 }
 
+Rules.Mutations = {
+    {
+        vault = Rules.Vaults[1], parent = Rules.Offspring[1][1], cost = 2,
+        route = "Вернись с луговым яйцом по мосту из лиан",
+        appearance = "Розовые крылья и светящаяся метка",
+        pet = species("bloom_moth_petal", "Лепестковый Цветокрыл", "Редкий", 242, 156, 196, "wings"),
+    },
+    {
+        vault = Rules.Vaults[2], parent = Rules.Offspring[2][1], cost = 2,
+        route = "Вернись с янтарным яйцом по синей ветровой тропе",
+        appearance = "Золотой панцирь и светящаяся метка",
+        pet = species("sun_shell_topaz", "Топазовый панцирник", "Редкий", 255, 186, 85, "shell"),
+    },
+    {
+        vault = Rules.Vaults[3], parent = Rules.Offspring[3][1], cost = 2,
+        route = "Вернись с грозовым яйцом через фиолетовый маяк",
+        appearance = "Бирюзовые рога и светящаяся метка",
+        pet = species("thunder_lynx_aurora", "Сияющая Громорысь", "Эпический", 122, 236, 245, "horns"),
+    },
+}
+for _, mutation in ipairs(Rules.Mutations) do
+    mutation.pet.mutated = true
+end
+
 Rules.Speeds = { 16, 20, 24, 30, 36 }
 Rules.UpgradeCosts = { 15, 35, 65, 95 }
 
@@ -236,6 +260,15 @@ function Rules.weeklySplitText(milliseconds, reference)
     end
     local gap = Rules.deliveryTimeText(math.abs(delta))
     return time .. " · " .. gap .. (if delta < 0 then " быстрее" else " медленнее")
+end
+
+function Rules.returnBridgeStage(stage, relativeX)
+    if stage == 0 and relativeX >= 0.25 then
+        return 1
+    elseif stage == 1 and relativeX <= -0.25 then
+        return 2
+    end
+    return stage
 end
 
 function Rules.stormTrialComplete(egg, usedAbility, secondsLeft)
