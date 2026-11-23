@@ -91,6 +91,34 @@ function Profile.mutatePet(entry, mutation)
     return true
 end
 
+local function readSeason(stored, definition)
+    local lastReward = definition.rewards[#definition.rewards]
+    if type(stored) ~= "table" or stored.id ~= definition.id
+        or not wholeNumber(stored.week, 0, MAX_COUNTER)
+        or not wholeNumber(stored.xp, 0, lastReward.xp) then
+        return nil
+    end
+
+    local season = { id = definition.id, week = stored.week, xp = stored.xp, counts = {}, claimed = {} }
+    if type(stored.counts) == "table" then
+        for _, quest in ipairs(definition.quests) do
+            local count = stored.counts[quest.id]
+            if wholeNumber(count, 1, quest.goal) then
+                season.counts[quest.id] = count
+            end
+        end
+    end
+    if type(stored.claimed) == "table" then
+        for index, reward in ipairs(definition.rewards) do
+            local key = tostring(index)
+            if stored.claimed[key] == true and season.xp >= reward.xp then
+                season.claimed[key] = true
+            end
+        end
+    end
+    return season
+end
+
 function Profile.read(stored, catalog, rules)
     if type(stored) ~= "table" or stored.version ~= Profile.VERSION
         or not wholeNumber(stored.coins, 0, 9e15) or not wholeNumber(stored.tier, 1, #rules.Speeds)
@@ -100,6 +128,7 @@ function Profile.read(stored, catalog, rules)
 
     local record = Profile.new(stored.coins)
     record.tier = stored.tier
+    record.season = readSeason(stored.season, rules.Season)
     record.deliveries = readCounts(stored.deliveries, rules.Vaults)
     record.prizeWins = readCounts(stored.prizeWins, rules.Prizes)
     record.materials = readCounts(stored.materials, rules.Vaults)
@@ -179,6 +208,13 @@ function Profile.snapshot(entry)
     record.materials = table.clone(entry.materials)
     record.catalysts = table.clone(entry.catalysts)
     record.discoveries = table.clone(entry.discoveries)
+    local season = entry.season
+    if season then
+        record.season = {
+            id = season.id, week = season.week, xp = season.xp,
+            counts = table.clone(season.counts), claimed = table.clone(season.claimed),
+        }
+    end
     record.weeklyRecord = entry.weeklyRecord
     record.weeklyRewardWeek = entry.weeklyRewardWeek
     record.onboarding = entry.onboarding

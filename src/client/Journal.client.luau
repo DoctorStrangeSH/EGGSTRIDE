@@ -6,6 +6,7 @@ local Rules = require(shared:WaitForChild("Rules"))
 local equipPet = shared:WaitForChild("EquipPet")
 local breedPet = shared:WaitForChild("BreedPet")
 local mutatePet = shared:WaitForChild("MutatePet")
+local claimSeason = shared:WaitForChild("ClaimSeasonReward")
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -177,6 +178,67 @@ local function menuButton(caption, order)
     fill(button, palette.gold, 10)
     return button
 end
+
+local season = Rules.Season
+local seasonButton = menuButton("Сезон «" .. season.name .. "»  +", -30)
+local seasonInfo = description("SeasonProgress", -29, palette.text)
+seasonInfo.TextXAlignment = Enum.TextXAlignment.Left
+local seasonExpanded = false
+local rewardButtons = {}
+
+for index, reward in ipairs(season.rewards) do
+    local action = menuButton("", -29 + index)
+    rewardButtons[index] = action
+    action.Activated:Connect(function()
+        if action.Active then
+            claimSeason:FireServer(index)
+        end
+    end)
+end
+
+local function updateSeason()
+    local xp = player:GetAttribute("SeasonXP")
+    local maximum = season.rewards[#season.rewards].xp
+    seasonButton.Text = string.format("Сезон «%s»  %s", season.name, if seasonExpanded then "−" else "+")
+    seasonInfo.Visible = seasonExpanded
+    local lines = {}
+    if xp ~= nil then
+        table.insert(lines, string.format("Опыт сезона · %d/%d", xp, maximum))
+        table.insert(lines, "Задания обновляются по понедельникам в 00:00 UTC.")
+        for _, quest in ipairs(season.quests) do
+            local count = player:GetAttribute("SeasonQuest_" .. quest.id) or 0
+            table.insert(lines, string.format("%s · %d/%d · +%d XP", quest.label, count, quest.goal, quest.xp))
+        end
+    else
+        table.insert(lines, "Загружаем прогресс сезона…")
+    end
+    seasonInfo.Text = table.concat(lines, "\n\n")
+    for index, reward in ipairs(season.rewards) do
+        local action = rewardButtons[index]
+        local claimed = player:GetAttribute("SeasonClaimed_" .. index) == true
+        local available = xp ~= nil and xp >= reward.xp and not claimed
+        local status = if claimed then "Получено" elseif available then "Забрать" else reward.xp .. " XP"
+        action.Text = string.format("%s · %s", reward.label, status)
+        action.Visible = seasonExpanded
+        action.Active = available
+        action.Selectable = available
+        action.AutoButtonColor = available
+        action.BackgroundColor3 = if claimed then palette.mint elseif available then palette.gold else palette.muted
+    end
+end
+
+seasonButton.Activated:Connect(function()
+    seasonExpanded = not seasonExpanded
+    updateSeason()
+end)
+player:GetAttributeChangedSignal("SeasonXP"):Connect(updateSeason)
+for _, quest in ipairs(season.quests) do
+    player:GetAttributeChangedSignal("SeasonQuest_" .. quest.id):Connect(updateSeason)
+end
+for index in ipairs(season.rewards) do
+    player:GetAttributeChangedSignal("SeasonClaimed_" .. index):Connect(updateSeason)
+end
+updateSeason()
 
 local mutationsButton = menuButton("Мутации  +", -20)
 local mutationCards = {}
@@ -513,6 +575,18 @@ for index, vault in ipairs(Rules.Vaults) do
         addPetRow(group, pet, "Питомник", true)
     end
     addPetRow(group, Rules.Mutations[index].pet, "Мутация", false)
+end
+
+order += 1
+local seasonGroup = { rows = {}, expanded = false, name = "Сезонные питомцы" }
+seasonGroup.button = menuButton("", order)
+seasonGroup.button.Activated:Connect(function()
+    seasonGroup.expanded = not seasonGroup.expanded
+    update()
+end)
+table.insert(collectionGroups, seasonGroup)
+for _, pet in ipairs(Rules.SeasonPets) do
+    addPetRow(seasonGroup, pet, "Награда сезона", false)
 end
 
 update = function()

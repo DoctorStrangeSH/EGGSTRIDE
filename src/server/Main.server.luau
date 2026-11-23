@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
 local World = require(script.Parent.World)
 local Loot = require(script.Parent.Loot)
+local Season = require(script.Parent.Season)
 local Nursery = require(script.Parent.Nursery)
 local RoundPrize = require(script.Parent.RoundPrize)
 local Profile = require(script.Parent.Profile)
@@ -34,6 +35,10 @@ local mutationsByPet = {}
 for _, mutation in ipairs(Rules.Mutations) do
     petCatalog[mutation.pet.id] = mutation.pet
     mutationsByPet[mutation.pet.id] = mutation
+end
+
+for _, pet in ipairs(Rules.SeasonPets) do
+    petCatalog[pet.id] = pet
 end
 
 local weeklyGroup = "EggstrideWeeklyRunners"
@@ -74,6 +79,10 @@ breedPet.Parent = Shared
 local mutatePet = Instance.new("RemoteEvent")
 mutatePet.Name = "MutatePet"
 mutatePet.Parent = Shared
+
+local claimSeason = Instance.new("RemoteEvent")
+claimSeason.Name = "ClaimSeasonReward"
+claimSeason.Parent = Shared
 
 local runFeedback = Instance.new("RemoteEvent")
 runFeedback.Name = "RunFeedback"
@@ -183,6 +192,17 @@ local function publish(player, entry, message)
     if message then
         player:SetAttribute("NoticeUntil", workspace:GetServerTimeNow() + 5)
         player:SetAttribute("Notice", message)
+    end
+end
+
+local function publishSeason(player, entry)
+    local progress = entry.season
+    player:SetAttribute("SeasonXP", progress.xp)
+    for _, quest in ipairs(Rules.Season.quests) do
+        player:SetAttribute("SeasonQuest_" .. quest.id, progress.counts[quest.id] or 0)
+    end
+    for index in ipairs(Rules.Season.rewards) do
+        player:SetAttribute("SeasonClaimed_" .. index, progress.claimed[tostring(index)] == true)
     end
 end
 
@@ -361,6 +381,7 @@ local function join(player)
         catalysts = record.catalysts,
         routeStage = 0,
         discoveries = record.discoveries,
+        season = record.season,
         weeklyRecord = record.weeklyRecord,
         weeklyRewardWeek = record.weeklyRewardWeek,
         tier = record.tier,
@@ -370,6 +391,7 @@ local function join(player)
         nextEquipAt = 0,
         nextBreedAt = 0,
         nextMutationAt = 0,
+        nextSeasonClaimAt = 0,
     }
     for id in pairs(record.owned) do
         entry.ownedPets[id] = petCatalog[id]
@@ -389,6 +411,8 @@ local function join(player)
         player:SetAttribute("PrizeWins_" .. definition.id, entry.prizeWins[definition.id] or 0)
     end
     local week = Rules.weekId(os.time())
+    Season.rollover(entry, Rules.Season, week)
+    publishSeason(player, entry)
     player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
     player:SetAttribute("WeeklyRewardClaimed", (entry.weeklyRewardWeek or -1) >= week)
     if entry.weeklyRecord and entry.weeklyRecord.week == week and entry.weeklyRecord.rankedTime then
@@ -601,12 +625,15 @@ local function finishWeekly(player, entry, root, now, week, completed)
     local result = if not attempt.rankable then "Вне рейтинга"
         elseif rankedBest then "Допущен к рейтингу"
         else "В рейтинге остаётся лучшее время"
+    if attempt.rankable and Season.advance(entry, Rules.Season, week, "weekly") then
+        publishSeason(player, entry)
+    end
     runFeedback:FireClient(player, "WeeklyFinish", milliseconds, best ~= nil, result, rewardCoins)
 end
 
 local displayedWeek
 
-local function hatch(player, entry, root, secondsLeft, now)
+local function hatch(player, entry, root, secondsLeft, now, week)
     local egg = entry.egg
     local vault = entry.eggVault
     local personalBest = Rules.improvedDelivery(entry.deliveryRecords[vault.id], now - entry.pickupAt)
@@ -625,6 +652,7 @@ local function hatch(player, entry, root, secondsLeft, now)
         bonus = definition.bonus
         showPrize(definition, false, "Доставил: " .. player.DisplayName)
     end
+    local routeCompleted = entry.routeStage == 2
     local catalystAwarded = Profile.awardCatalyst(entry, vault, entry.routeStage)
     clearEgg(player, entry)
     entry.delivered = true
@@ -634,6 +662,13 @@ local function hatch(player, entry, root, secondsLeft, now)
         else Loot.hatchForRoll(vault, egg, random:NextInteger(1, 10000))
     local prizeId = if awardedPrize then definition.id else nil
     local isNew, materialGain = Profile.recordHatch(entry, vault, pet, prizeId)
+    local seasonChanged = Season.advance(entry, Rules.Season, week, "delivery")
+    if routeCompleted and Season.advance(entry, Rules.Season, week, "route") then
+        seasonChanged = true
+    end
+    if seasonChanged then
+        publishSeason(player, entry)
+    end
     publishBiomeProgress(player, entry, vault.id)
     if prizeId then
         player:SetAttribute("PrizeWins_" .. prizeId, entry.prizeWins[prizeId])
@@ -708,6 +743,9 @@ local function syncRound()
     for player, entry in pairs(entries) do
         local humanoid, root = characterParts(player)
         if weekChanged then
+            if Season.rollover(entry, Rules.Season, week) then
+                publishSeason(player, entry)
+            end
             player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
             player:SetAttribute("WeeklyRewardClaimed", (entry.weeklyRewardWeek or -1) >= week)
         end
@@ -755,7 +793,7 @@ local function syncRound()
         if open and not entry.weekly and entry.egg and humanoid and humanoid.Health > 0 and root
             and not ProfileStore.expired(entry.session) then
             if (root.Position - map.hatch.Position).Magnitude <= 8 then
-                hatch(player, entry, root, secondsLeft, now)
+                hatch(player, entry, root, secondsLeft, now, week)
             else
                 updateAbility(player, entry, root, now)
             end
@@ -972,6 +1010,36 @@ mutatePet.OnServerEvent:Connect(function(player, petId)
         player:SetAttribute("Catalyst_" .. vaultId, entry.catalysts[vaultId])
         publish(player, entry, "Новая форма: " .. mutation.pet.name .. ".")
     end
+end)
+
+claimSeason.OnServerEvent:Connect(function(player, index)
+    local entry = entries[player]
+    if closing or not entry or ProfileStore.expired(entry.session)
+        or typeof(index) ~= "number" or index < 1 or index > #Rules.Season.rewards or index % 1 ~= 0 then
+        return
+    end
+    local now = os.clock()
+    if now < entry.nextSeasonClaimAt then
+        return
+    end
+    entry.nextSeasonClaimAt = now + 0.2
+
+    local week = Rules.weekId(os.time())
+    local claimed, rolledOver = Season.claim(entry, Rules.Season, week, index)
+    if not claimed then
+        if rolledOver then
+            publishSeason(player, entry)
+        end
+        return
+    end
+    local reward = Rules.Season.rewards[index]
+    if reward.pet then
+        player:SetAttribute("OwnsPet_" .. reward.pet.id, true)
+    elseif reward.material then
+        publishBiomeProgress(player, entry, reward.material)
+    end
+    publishSeason(player, entry)
+    publish(player, entry, "Награда сезона: " .. reward.label .. ".")
 end)
 
 equipPet.OnServerEvent:Connect(function(player, petId)

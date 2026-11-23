@@ -185,6 +185,25 @@ for _, mutation in ipairs(Rules.Mutations) do
     mutation.pet.mutated = true
 end
 
+Rules.SeasonPets = {
+    species("season_sky_firefly", "Небесный светляк", "Эпический", 133, 219, 255, "wings"),
+}
+Rules.Season = {
+    id = "sky_routes_01",
+    name = "Тропы неба",
+    quests = {
+        { id = "delivery", label = "Доставь яйца в любых биомах", goal = 3, xp = 30 },
+        { id = "route", label = "Доставь яйца по особым маршрутам", goal = 2, xp = 40 },
+        { id = "weekly", label = "Финишируй с зачётом в забеге недели", goal = 1, xp = 50 },
+    },
+    rewards = {
+        { xp = 30, coins = 40, label = "40 монет" },
+        { xp = 70, material = "meadow", amount = 2, label = "2 луговых нектара" },
+        { xp = 120, coins = 100, label = "100 монет" },
+        { xp = 220, material = "amber", amount = 3, label = "3 янтарных крошки" },
+        { xp = 360, label = Rules.SeasonPets[1].name, pet = Rules.SeasonPets[1] },
+    },
+}
 Rules.Speeds = { 16, 20, 24, 30, 36 }
 Rules.UpgradeCosts = { 15, 35, 65, 95 }
 
