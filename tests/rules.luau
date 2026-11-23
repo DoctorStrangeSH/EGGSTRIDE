@@ -1,6 +1,7 @@
 local Rules = require("../src/shared/Rules")
 local Loot = require("../src/server/Loot")
 local RoundPrize = require("../src/server/RoundPrize")
+local Nursery = require("../src/server/Nursery")
 
 local function phase(at, expectedOpen, expectedLeft)
     local open, left = Rules.clock(at)
@@ -40,7 +41,8 @@ for index, vault in ipairs(Rules.Vaults) do
     local home = (vault.x - Rules.HatchX + 32) / Rules.speed(vault.tier, true)
     assert(outward + home + 3 < Rules.RunSeconds, "Unlock-tier route budget: " .. vault.name)
 
-    for _, pet in pairs(vault.pets) do
+    assert(#vault.pets == 12)
+    for _, pet in ipairs(vault.pets) do
         assert(pet.id:match("^[a-z_]+$") and #pet.id <= 32, "Invalid companion id: " .. pet.id)
         assert(not petIds[pet.id], "Duplicate companion id: " .. pet.id)
         petIds[pet.id] = true
@@ -53,15 +55,19 @@ for index, vault in ipairs(Rules.Vaults) do
     assert(Loot.eggForRoll(index, ordinary.weight + 1) == rare)
     assert(ordinary.weight + rare.weight == 100)
     for _, egg in ipairs({ ordinary, rare }) do
-        local rareCount = 0
-        for roll = 1, 100 do
+        local rareCount, drops = 0, {}
+        for roll = 1, 10000 do
             local result = Loot.hatchForRoll(vault, egg, roll)
-            assert(result == vault.pets.rare or result == vault.pets.common, "Wrong biome")
-            if result == vault.pets.rare then
+            assert(table.find(vault.pets, result), "Wrong biome")
+            drops[result.id] = true
+            if result.rarity == "Редкий" then
                 rareCount += 1
             end
         end
-        assert(rareCount == (if egg == ordinary then 15 else 35))
+        for _, pet in ipairs(vault.pets) do
+            assert(drops[pet.id], "Unreachable pet: " .. pet.id)
+        end
+        assert(rareCount == (if egg == ordinary then 1500 else 3500))
     end
 end
 assert(Rules.canUseVault(1, Rules.Vaults[1]) and not Rules.canUseVault(1, Rules.Vaults[2]))
@@ -77,26 +83,42 @@ assert(RoundPrize.deliver(stormPrize, "second"))
 assert(RoundPrize.release(amberPrize, "first"))
 assert(RoundPrize.claim(amberPrize, "third"))
 
-local relicIds = {}
-local relicRolls = {}
-local highRarityCount = 0
-assert(#Rules.RelicPets == 10)
-for _, pet in ipairs(Rules.RelicPets) do
-    assert(not petIds[pet.id] and not relicIds[pet.id])
-    relicIds[pet.id] = true
+assert(#Rules.Prizes == #Rules.Vaults)
+for index, prize in ipairs(Rules.Prizes) do
+    assert(prize.vaultIndex == index and prize.id == Rules.Vaults[index].id and #prize.pets == 5)
+    local drops, highRarityCount = {}, 0
+    for roll = 1, 1000 do
+        local pet = Loot.prizePetForRoll(prize.pets, roll)
+        assert(table.find(prize.pets, pet) and pet.rarity ~= "Обычный")
+        drops[pet.id] = (drops[pet.id] or 0) + 1
+        if pet.rarity ~= "Редкий" then
+            highRarityCount += 1
+        end
+    end
+    for _, pet in ipairs(prize.pets) do
+        assert(not petIds[pet.id] and drops[pet.id] > 0)
+        petIds[pet.id] = true
+    end
+    assert(highRarityCount >= 700 and drops[prize.pets[5].id] == 20)
 end
-for roll = 1, 1000 do
-    local pet = Loot.relicPetForRoll(Rules.RelicPets, roll)
-    assert(relicIds[pet.id] and pet.rarity ~= "Обычный")
-    relicRolls[pet.id] = (relicRolls[pet.id] or 0) + 1
-    if pet.rarity ~= "Редкий" then
-        highRarityCount += 1
+
+local byPair, byOffspring = Nursery.recipes(Rules)
+for index, offspring in ipairs(Rules.Offspring) do
+    for _, pet in ipairs(offspring) do
+        assert(not petIds[pet.id] and byOffspring[pet.id])
+        petIds[pet.id] = true
+        local recipe = byOffspring[pet.id]
+        assert(recipe.vault == Rules.Vaults[index])
+        local first, second = table.unpack(recipe.parents)
+        assert(first ~= second and table.find(recipe.vault.pets, first) and table.find(recipe.vault.pets, second))
+        assert(Nursery.find(byPair, first.id, second.id) == recipe and Nursery.find(byPair, second.id, first.id) == recipe)
     end
 end
-assert(highRarityCount == 670 and relicRolls.eclipse_drake == 20)
-for id in pairs(relicIds) do
-    assert(relicRolls[id] > 0)
+local total = 0
+for _ in pairs(petIds) do
+    total += 1
 end
+assert(total == 100)
 
 assert(Rules.onboardingAfterPickup(1) == 2)
 assert(Rules.onboardingAfterPickup(2) == 2)

@@ -9,7 +9,7 @@ function Profile.new(startCoins)
         version = Profile.VERSION, coins = startCoins, tier = 1, owned = {},
         equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
         muteRunSounds = false, reduceCardMotion = false,
-        deliveries = {}, prizeWins = {}, materials = {},
+        deliveries = {}, prizeWins = {}, materials = {}, discoveries = {},
     }
 end
 
@@ -53,17 +53,21 @@ end
 
 function Profile.breed(entry, recipe)
     local pet = recipe.offspring
-    local parents = recipe.vault.pets
+    local parents = recipe.parents
     local vaultId = recipe.vault.id
     local stock = entry.materials[vaultId] or 0
-    if entry.ownedPets[pet.id] or not entry.ownedPets[parents.common.id]
-        or not entry.ownedPets[parents.rare.id] or stock < recipe.cost then
+    if entry.discoveries[pet.id] or not entry.ownedPets[parents[1].id]
+        or not entry.ownedPets[parents[2].id] then
         return false
     end
-
-    -- Ownership and materials are snapshotted together from this profile.
-    entry.materials[vaultId] = stock - recipe.cost
-    entry.ownedPets[pet.id] = pet
+    if not entry.ownedPets[pet.id] then
+        if stock < recipe.cost then
+            return false
+        end
+        entry.materials[vaultId] = stock - recipe.cost
+        entry.ownedPets[pet.id] = pet
+    end
+    entry.discoveries[pet.id] = true
     return true
 end
 
@@ -121,6 +125,14 @@ function Profile.read(stored, catalog, rules)
             record.owned[id] = true
         end
     end
+    for _, offspring in ipairs(rules.Offspring) do
+        for index, pet in ipairs(offspring) do
+            if record.owned[pet.id] and ((type(stored.discoveries) == "table" and stored.discoveries[pet.id] == true)
+                or (stored.discoveries == nil and index == 1)) then
+                record.discoveries[pet.id] = true
+            end
+        end
+    end
     if type(stored.equipped) == "string" and record.owned[stored.equipped] then
         record.equipped = stored.equipped
     else
@@ -144,6 +156,7 @@ function Profile.snapshot(entry)
     record.deliveries = table.clone(entry.deliveries)
     record.prizeWins = table.clone(entry.prizeWins)
     record.materials = table.clone(entry.materials)
+    record.discoveries = table.clone(entry.discoveries)
     record.weeklyRecord = entry.weeklyRecord
     record.weeklyRewardWeek = entry.weeklyRewardWeek
     record.onboarding = entry.onboarding

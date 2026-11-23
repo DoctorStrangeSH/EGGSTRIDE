@@ -168,74 +168,136 @@ local function description(name, order, color)
     return label
 end
 
-local nurseryButton = textItem("TextButton", list, "Питомник  +", 14, palette.panel)
-nurseryButton.LayoutOrder = -6 - 2 * #Rules.BreedingRecipes
-nurseryButton.Size = UDim2.new(1, -8, 0, 44)
-fill(nurseryButton, palette.gold, 10)
+local function menuButton(caption, order)
+    local button = textItem("TextButton", list, caption, 14, palette.panel)
+    button.LayoutOrder = order
+    button.Size = UDim2.new(1, -8, 0, 44)
+    button.TextWrapped = true
+    fill(button, palette.gold, 10)
+    return button
+end
+
+local nurseryButton = menuButton("Питомник  +", -12)
+local biomeButton = menuButton("", -11)
+local experiment = menuButton("Проверить пару", -10)
+local nurseryInfo = description("Experiment", -9, palette.text)
+nurseryInfo.TextXAlignment = Enum.TextXAlignment.Left
+local choices = Instance.new("Frame")
+choices.Name = "Parents"
+choices.LayoutOrder = -8
+choices.BackgroundTransparency = 1
+choices.Size = UDim2.new(1, -8, 0, 0)
+choices.Parent = list
+local grid = Instance.new("UIGridLayout")
+grid.CellSize = UDim2.new(0.5, -3, 0, 44)
+grid.CellPadding = UDim2.fromOffset(6, 6)
+grid.FillDirectionMaxCells = 2
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+grid.Parent = choices
+grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    choices.Size = UDim2.new(1, -8, 0, grid.AbsoluteContentSize.Y)
+end)
 
 local nurseryExpanded = false
-local recipeCards = {}
+local biomeIndex = 1
+local selected = {}
+local parentButtons = {}
+local tested = {}
 
-for index, recipe in ipairs(Rules.BreedingRecipes) do
-    local offspring = recipe.offspring
-    local common = recipe.vault.pets.common
-    local rare = recipe.vault.pets.rare
-    local order = nurseryButton.LayoutOrder + index * 2
-    local info = description("Recipe_" .. offspring.id, order - 1, palette.text)
-    info.TextXAlignment = Enum.TextXAlignment.Left
-    local action = textItem("TextButton", list, "", 13, palette.panel)
-    action.LayoutOrder = order
-    action.Size = UDim2.new(1, -8, 0, 44)
-
-    local materialAttribute = "Material_" .. recipe.vault.id
-    local canBreed
-    local function updateRecipe()
-        local stock = player:GetAttribute(materialAttribute)
-        local hasCommon = player:GetAttribute("OwnsPet_" .. common.id) == true
-        local hasRare = player:GetAttribute("OwnsPet_" .. rare.id) == true
-        local owned = player:GetAttribute("OwnsPet_" .. offspring.id) == true
-        canBreed = stock ~= nil and stock >= recipe.cost and hasCommon and hasRare and not owned
-
-        local parents = string.format("%s + %s · %d/2", common.name, rare.name,
-            (if hasCommon then 1 else 0) + (if hasRare then 1 else 0))
-        local materials = string.format("%s · %d/%d", recipe.vault.material, stock or 0, recipe.cost)
-        info.Text = offspring.name .. " · " .. offspring.rarity
-            .. (if owned then "" else "\n" .. parents .. "\n" .. materials)
-        action.Text = if owned then "Уже в коллекции"
-            elseif stock == nil then "Загружаем материалы…"
-            elseif not (hasCommon and hasRare) then "Нужны оба родителя"
-            elseif stock < recipe.cost then "Нужны материалы"
-            else "Вывести питомца"
-        action.Active = canBreed
-        action.Selectable = canBreed
-        action.AutoButtonColor = canBreed
-        action.BackgroundColor3 = if owned then palette.mint elseif canBreed then palette.gold else palette.muted
+local function pairKey(first, second)
+    if first > second then
+        first, second = second, first
     end
+    return first .. ":" .. second
+end
 
-    fill(action, palette.muted, 10)
-    info.Visible = false
-    action.Visible = false
-    table.insert(recipeCards, { info = info, action = action })
-
-    for _, attribute in ipairs({ materialAttribute, "OwnsPet_" .. common.id, "OwnsPet_" .. rare.id, "OwnsPet_" .. offspring.id }) do
-        player:GetAttributeChangedSignal(attribute):Connect(updateRecipe)
-    end
-    action.Activated:Connect(function()
-        if canBreed then
-            breedPet:FireServer(offspring.id)
+local function updateNursery()
+    local vault = Rules.Vaults[biomeIndex]
+    local first, second = selected[1], selected[2]
+    local result = if first and second then tested[pairKey(first.id, second.id)] else nil
+    local canExperiment = first ~= nil and second ~= nil and (not result or not result.finished)
+    local count = 0
+    for _, item in ipairs(parentButtons) do
+        local visible = item.biomeIndex == biomeIndex and player:GetAttribute("OwnsPet_" .. item.pet.id) == true
+        item.button.Visible = visible
+        item.button.BackgroundColor3 = if table.find(selected, item.pet) then palette.mint else palette.muted
+        if visible then
+            count += 1
         end
-    end)
-    updateRecipe()
+    end
+    nurseryButton.Text = if nurseryExpanded then "Питомник  −" else "Питомник  +"
+    biomeButton.Text = string.format("%s · сменить биом", vault.name)
+    experiment.Active = canExperiment
+    experiment.Selectable = canExperiment
+    experiment.AutoButtonColor = canExperiment
+    experiment.BackgroundColor3 = if canExperiment then palette.gold else palette.muted
+    local text = if count < 2 then "Вылупи двух разных питомцев из обычных яиц этого биома."
+        elseif first and second then first.name .. " + " .. second.name
+        elseif first then first.name .. " + выбери второго родителя"
+        else "Выбери двух родителей. Неподходящая пара не расходует материалы."
+    if result then
+        text ..= "\n" .. result.text
+    end
+    local stock = player:GetAttribute("Material_" .. vault.id)
+    nurseryInfo.Text = text .. "\n" .. string.format("%s · %d/%d", vault.material, stock or 0, biomeIndex + 1)
+    biomeButton.Visible = nurseryExpanded
+    nurseryInfo.Visible = nurseryExpanded
+    experiment.Visible = nurseryExpanded
+    choices.Visible = nurseryExpanded and count > 0
+end
+
+for index, vault in ipairs(Rules.Vaults) do
+    for position, pet in ipairs(vault.pets) do
+        local button = textItem("TextButton", choices, pet.name, 13, palette.panel)
+        button.TextWrapped = true
+        button.LayoutOrder = position
+        fill(button, palette.muted, 8)
+        button.Activated:Connect(function()
+            local existing = table.find(selected, pet)
+            if existing then
+                table.remove(selected, existing)
+            elseif #selected < 2 then
+                table.insert(selected, pet)
+            else
+                selected[2] = pet
+            end
+            updateNursery()
+        end)
+        table.insert(parentButtons, { pet = pet, button = button, biomeIndex = index })
+        player:GetAttributeChangedSignal("OwnsPet_" .. pet.id):Connect(updateNursery)
+    end
+    player:GetAttributeChangedSignal("Material_" .. vault.id):Connect(updateNursery)
 end
 
 nurseryButton.Activated:Connect(function()
     nurseryExpanded = not nurseryExpanded
-    nurseryButton.Text = if nurseryExpanded then "Питомник  −" else "Питомник  +"
-    for _, card in ipairs(recipeCards) do
-        card.info.Visible = nurseryExpanded
-        card.action.Visible = nurseryExpanded
-    end
+    updateNursery()
 end)
+biomeButton.Activated:Connect(function()
+    biomeIndex = biomeIndex % #Rules.Vaults + 1
+    table.clear(selected)
+    updateNursery()
+end)
+
+local nextAttemptAt = 0
+experiment.Activated:Connect(function()
+    local first, second = selected[1], selected[2]
+    if not experiment.Active or not first or not second or os.clock() < nextAttemptAt then
+        return
+    end
+    nextAttemptAt = os.clock() + 0.5
+    breedPet:FireServer(first.id, second.id)
+end)
+breedPet.OnClientEvent:Connect(function(firstId, secondId, status, name)
+    local key = pairKey(firstId, secondId)
+    local message = if status == "found" then "Открытие: " .. name .. ". Пара записана в дневнике."
+        elseif status == "known" then "Эта пара уже в дневнике: " .. name
+        elseif status == "miss" then "Пара не подошла. Попробуй другую."
+        else "Этой паре нужны материалы."
+    tested[key] = { text = message, finished = status ~= "materials" }
+    updateNursery()
+end)
+updateNursery()
 
 local progressButton = textItem("TextButton", list, "Статистика и материалы  +", 14, palette.panel)
 progressButton.LayoutOrder = -5
@@ -317,10 +379,10 @@ leaderboardFeed:GetAttributeChangedSignal("SessionOnly"):Connect(updateBoard)
 updateBoard()
 
 local rows = {}
-local recordLabels = {}
+local collectionGroups = {}
 local order = 3
 
-local function addPetRow(pet, source, exclusive)
+local function addPetRow(group, pet, source, secret)
     local row = Instance.new("Frame")
     row.Name = pet.id
     order += 1
@@ -366,42 +428,36 @@ local function addPetRow(pet, source, exclusive)
             equipPet:FireServer(pet.id)
         end
     end)
-    table.insert(rows, { id = pet.id, frame = row, action = action, name = name, pet = pet, exclusive = exclusive })
+    local entry = {
+        id = pet.id, frame = row, action = action, name = name, details = details,
+        pet = pet, secret = secret, source = source, group = group,
+    }
+    table.insert(rows, entry)
+    table.insert(group.rows, entry)
 end
 
-for _, vault in ipairs(Rules.Vaults) do
+local update
+for index, vault in ipairs(Rules.Vaults) do
     order += 1
-    local record = description("DeliveryRecord_" .. vault.id, order, palette.gold)
-    record.BackgroundTransparency = 1
-    recordLabels[vault] = record
-    for _, pet in ipairs({ vault.pets.common, vault.pets.rare }) do
-        addPetRow(pet, vault.name .. " остров", false)
+    local group = { rows = {}, expanded = false, name = vault.name }
+    group.button = menuButton("", order)
+    group.button.Activated:Connect(function()
+        group.expanded = not group.expanded
+        update()
+    end)
+    table.insert(collectionGroups, group)
+    for _, pet in ipairs(vault.pets) do
+        addPetRow(group, pet, "Обычное яйцо", false)
+    end
+    for _, pet in ipairs(Rules.Prizes[index].pets) do
+        addPetRow(group, pet, Rules.Prizes[index].name, true)
+    end
+    for _, pet in ipairs(Rules.Offspring[index]) do
+        addPetRow(group, pet, "Питомник", true)
     end
 end
 
-for _, recipe in ipairs(Rules.BreedingRecipes) do
-    addPetRow(recipe.offspring, "Питомник", false)
-end
-
-order += 1
-local relicCollection = textItem("TextButton", list, "", 14, palette.panel)
-relicCollection.LayoutOrder = order
-relicCollection.Size = UDim2.new(1, -8, 0, 44)
-fill(relicCollection, palette.gold, 10)
-for _, pet in ipairs(Rules.RelicPets) do
-    addPetRow(pet, "Грозовая реликвия", true)
-end
-local relicExpanded = false
-local function toggleRelicRows()
-    for _, row in ipairs(rows) do
-        if row.exclusive then
-            row.frame.Visible = relicExpanded
-        end
-    end
-end
-toggleRelicRows()
-
-local function update()
+update = function()
     local equipped = player:GetAttribute("EquippedPetId")
     local time = player:GetAttribute("WeeklyBest")
     local heading = if time then "Рекорд недели · " .. Rules.deliveryTimeText(time)
@@ -416,49 +472,42 @@ local function update()
         trial.Text = string.format("%s\nДоставь грозовое яйцо через маяк, пока на таймере %d+ сек.",
             Rules.StormTrial.name, Rules.StormTrial.secondsLeft)
     end
-    for vault, label in pairs(recordLabels) do
-        local time = player:GetAttribute("DeliveryRecord_" .. vault.id)
-        label.Text = vault.name .. (if time then " · Рекорд " .. Rules.deliveryTimeText(time) else " · Пока без рекорда")
-    end
     local count = 0
-    local relicCount = 0
+    local groupCounts = {}
     for _, row in ipairs(rows) do
         local owned = player:GetAttribute("OwnsPet_" .. row.id) == true
         local selected = owned and equipped == row.id
         if owned then
             count += 1
-            if row.exclusive then
-                relicCount += 1
-            end
+            groupCounts[row.group] = (groupCounts[row.group] or 0) + 1
         end
-        if row.exclusive then
-            row.name.Text = if owned then row.pet.name .. " · " .. row.pet.rarity else "Неизвестный питомец"
-        end
+        row.frame.Visible = row.group.expanded
+        row.name.Text = if owned then row.pet.name .. " · " .. row.pet.rarity
+            elseif row.secret then "Неизвестный питомец" else row.pet.name
+        local recipe = player:GetAttribute("Recipe_" .. row.id)
+        row.details.Text = if recipe then "Скрестить: " .. recipe else row.source
         row.action.Text = if selected then "Спутник" elseif owned then "Выбрать" else "Не открыт"
         row.action.BackgroundColor3 = if selected then palette.mint elseif owned then palette.gold else palette.muted
         row.action.Active = owned and not selected
         row.action.Selectable = owned and not selected
         row.action.AutoButtonColor = owned and not selected
     end
-    relicCollection.Text = string.format("Грозовая коллекция %d/%d  %s", relicCount, #Rules.RelicPets, if relicExpanded then "−" else "+")
+    for _, group in ipairs(collectionGroups) do
+        group.button.Text = string.format("%s · %d/%d  %s", group.name, groupCounts[group] or 0,
+            #group.rows, if group.expanded then "−" else "+")
+    end
     open.Text = string.format("Питомцы %d/%d", count, #rows)
     title.Text = string.format("Коллекция %d/%d", count, #rows)
 end
-
-relicCollection.Activated:Connect(function()
-    relicExpanded = not relicExpanded
-    toggleRelicRows()
-    update()
-end)
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)
 player:GetAttributeChangedSignal("WeeklyBest"):Connect(update)
 player:GetAttributeChangedSignal("WeeklyRewardClaimed"):Connect(update)
 player:GetAttributeChangedSignal("StormTrailUnlocked"):Connect(update)
-for vault in pairs(recordLabels) do
-    player:GetAttributeChangedSignal("DeliveryRecord_" .. vault.id):Connect(update)
-end
 for _, row in ipairs(rows) do
     player:GetAttributeChangedSignal("OwnsPet_" .. row.id):Connect(update)
+    if row.source == "Питомник" then
+        player:GetAttributeChangedSignal("Recipe_" .. row.id):Connect(update)
+    end
 end
 update()

@@ -1,16 +1,16 @@
 local Loot = {}
 
 -- Indexes match the public collection. Weights are server-side and sum to 1000.
-local relicWeights = { 66, 66, 66, 66, 66, 170, 170, 170, 140, 20 }
+local prizeWeights = { 300, 260, 240, 180, 20 }
 
-function Loot.relicPetForRoll(pets, roll)
-    for index, weight in ipairs(relicWeights) do
+function Loot.prizePetForRoll(pets, roll)
+    for index, weight in ipairs(prizeWeights) do
         roll -= weight
         if roll <= 0 then
             return pets[index]
         end
     end
-    error("Relic roll exceeds the prize pool")
+    error("Prize roll exceeds the prize pool")
 end
 
 local rareChance = { ordinary = 15, rare = 35 }
@@ -40,7 +40,18 @@ function Loot.eggForRoll(vaultIndex, roll)
 end
 
 function Loot.hatchForRoll(vault, egg, roll)
-    return if roll <= rareChance[egg.rarity] then vault.pets.rare else vault.pets.common
+    local rareLimit = rareChance[egg.rarity] * 100
+    local rare = roll <= rareLimit
+    local offset = if rare then roll else roll - rareLimit
+    local size = if rare then rareLimit else 10000 - rareLimit
+    local starterWeight = math.floor(size * 0.36)
+    if offset <= starterWeight then
+        return vault.pets[if rare then 2 else 1]
+    end
+    local first = if rare then 9 else 3
+    local extra = if rare then 4 else 6
+    local extraIndex = math.floor((offset - starterWeight - 1) * extra / (size - starterWeight))
+    return vault.pets[first + extraIndex]
 end
 
 return Loot

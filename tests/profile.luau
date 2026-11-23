@@ -4,18 +4,22 @@ local Loot = require("../src/server/Loot")
 
 local catalog = {}
 for _, vault in ipairs(Rules.Vaults) do
-    for _, pet in pairs(vault.pets) do
+    for _, pet in ipairs(vault.pets) do
         catalog[pet.id] = pet
     end
 end
 
-for _, pet in ipairs(Rules.RelicPets) do
-    catalog[pet.id] = pet
+for _, prize in ipairs(Rules.Prizes) do
+    for _, pet in ipairs(prize.pets) do
+        catalog[pet.id] = pet
+    end
 end
 
-for _, recipe in ipairs(Rules.BreedingRecipes) do
-    assert(not catalog[recipe.offspring.id])
-    catalog[recipe.offspring.id] = recipe.offspring
+local Nursery = require("../src/server/Nursery")
+local byPair, byOffspring = Nursery.recipes(Rules)
+for id, recipe in pairs(byOffspring) do
+    assert(not catalog[id])
+    catalog[id] = recipe.offspring
 end
 
 local defaults = Profile.new(Rules.StartCoins)
@@ -31,7 +35,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 
 local pet = catalog.dew_moth
 local entry = {
-    deliveries = {}, prizeWins = {}, materials = {},
+    deliveries = {}, prizeWins = {}, materials = {}, discoveries = {},
     coins = 77, tier = 2, weeklyRewardWeek = 20, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
     onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200, rankedSplits = { 2000, 4500, 6500, 9000, 12000, 15200 } }, delivered = true, egg = Loot.eggForRoll(1, 1),
 }
@@ -94,17 +98,17 @@ local invalid, invalidReason = Profile.acquire(snapshot, "server_c", 400, catalo
 assert(invalid == nil and invalidReason == "invalid")
 assert(Profile.acquire({version = 1, coins = -1, tier = 1, owned = {}}, "server_c", 400, catalog, Rules) == nil)
 
-local relic = Rules.RelicPets[10]
+local relic = Rules.Prizes[3].pets[5]
 assert(not next(legacyProfile.deliveries) and not next(legacyProfile.prizeWins) and not next(legacyProfile.materials))
 local meadow, storm = Rules.Vaults[1], Rules.Vaults[3]
-local isNew, gain = Profile.recordHatch(entry, meadow, meadow.pets.common)
-assert(isNew and gain == 0 and entry.ownedPets[meadow.pets.common.id] == meadow.pets.common)
-isNew, gain = Profile.recordHatch(entry, meadow, meadow.pets.common)
+local isNew, gain = Profile.recordHatch(entry, meadow, meadow.pets[1])
+assert(isNew and gain == 0 and entry.ownedPets[meadow.pets[1].id] == meadow.pets[1])
+isNew, gain = Profile.recordHatch(entry, meadow, meadow.pets[1])
 assert(not isNew and gain == 1 and entry.deliveries.meadow == 2 and entry.materials.meadow == 1)
 assert(not next(entry.prizeWins))
-isNew, gain = Profile.recordHatch(entry, storm, relic, Rules.Prizes[2].id)
+isNew, gain = Profile.recordHatch(entry, storm, relic, Rules.Prizes[3].id)
 assert(isNew and gain == 0)
-isNew, gain = Profile.recordHatch(entry, storm, relic, Rules.Prizes[2].id)
+isNew, gain = Profile.recordHatch(entry, storm, relic, Rules.Prizes[3].id)
 assert(not isNew and gain == 1 and entry.deliveries.storm == 2 and entry.prizeWins.storm == 2)
 entry.pet = relic
 local progressSnapshot = Profile.snapshot(entry)
@@ -118,21 +122,22 @@ Profile.recordHatch(entry, storm, relic, "storm")
 assert(progressSnapshot.deliveries.storm == 2 and progressSnapshot.prizeWins.storm == 2 and progressSnapshot.materials.storm == 1)
 progressSnapshot.deliveries.unknown = 50
 progressSnapshot.deliveries.amber = 1.5
-progressSnapshot.prizeWins.meadow = 1
+progressSnapshot.prizeWins.unknown = 1
 progressSnapshot.prizeWins.amber = -1
 progressSnapshot.materials.storm = "50"
 local cleanProgress = Profile.read(progressSnapshot, catalog, Rules)
 assert(cleanProgress.deliveries.meadow == 2 and not cleanProgress.deliveries.unknown and not cleanProgress.deliveries.amber)
-assert(cleanProgress.prizeWins.storm == 2 and not cleanProgress.prizeWins.meadow and not cleanProgress.prizeWins.amber)
+assert(cleanProgress.prizeWins.storm == 2 and not cleanProgress.prizeWins.unknown and not cleanProgress.prizeWins.amber)
 assert(cleanProgress.materials.meadow == 1 and not cleanProgress.materials.storm)
 
-for _, recipe in ipairs(Rules.BreedingRecipes) do
+for _, recipe in pairs(byOffspring) do
     local vaultId = recipe.vault.id
     local offspringId = recipe.offspring.id
-    local common = recipe.vault.pets.common
-    local rare = recipe.vault.pets.rare
+    local common = recipe.parents[1]
+    local rare = recipe.parents[2]
     local breeder = {
         materials = { [vaultId] = recipe.cost },
+        discoveries = {},
         ownedPets = { [common.id] = common },
     }
     assert(not Profile.breed(breeder, recipe))
@@ -151,9 +156,9 @@ for _, recipe in ipairs(Rules.BreedingRecipes) do
     assert(not Profile.breed(breeder, recipe) and breeder.materials[vaultId] == recipe.cost)
 end
 
-local recipe = Rules.BreedingRecipes[1]
-entry.ownedPets[recipe.vault.pets.common.id] = recipe.vault.pets.common
-entry.ownedPets[recipe.vault.pets.rare.id] = recipe.vault.pets.rare
+local recipe = byOffspring.bloom_moth
+entry.ownedPets[recipe.parents[1].id] = recipe.parents[1]
+entry.ownedPets[recipe.parents[2].id] = recipe.parents[2]
 entry.materials[recipe.vault.id] = recipe.cost + 1
 local previousDeliveries = entry.deliveries[recipe.vault.id]
 assert(Profile.breed(entry, recipe))
@@ -162,5 +167,24 @@ local breedingSave = Profile.write(opened, Profile.snapshot(entry), "server_a", 
 local breedingProfile = Profile.acquire(breedingSave, "server_e", 183, catalog, Rules)
 assert(breedingProfile.owned[recipe.offspring.id] and breedingProfile.equipped == recipe.offspring.id)
 assert(breedingProfile.materials[recipe.vault.id] == 1 and breedingProfile.deliveries[recipe.vault.id] == previousDeliveries)
+
+assert(breedingProfile.discoveries[recipe.offspring.id])
+local legacyStorage = Profile.snapshot(entry)
+legacyStorage.discoveries = nil
+legacyStorage.owned.cloud_lynx = true
+local legacyNursery = Profile.read(legacyStorage, catalog, Rules)
+assert(legacyNursery.discoveries.bloom_moth and legacyNursery.owned.cloud_lynx and not legacyNursery.discoveries.cloud_lynx)
+
+local oldRelic = byOffspring.cloud_lynx
+local collector = { materials = {}, discoveries = {}, ownedPets = { cloud_lynx = oldRelic.offspring } }
+for _, parent in ipairs(oldRelic.parents) do
+    collector.ownedPets[parent.id] = parent
+end
+assert(Profile.breed(collector, oldRelic) and not next(collector.materials))
+assert(collector.discoveries.cloud_lynx and not Profile.breed(collector, oldRelic))
+assert(Nursery.find(byPair, "leaf_tail", "dew_moth") == recipe)
+assert(Nursery.find(byPair, "dew_moth", "leaf_tail") == recipe)
+assert(not Nursery.find(byPair, "leaf_tail", "amber_crab"))
+assert(not Nursery.find(byPair, "leaf_tail", "clover_hare"))
 
 print("Eggstride profiles: OK")

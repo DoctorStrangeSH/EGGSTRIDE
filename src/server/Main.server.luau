@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
 local World = require(script.Parent.World)
 local Loot = require(script.Parent.Loot)
+local Nursery = require(script.Parent.Nursery)
 local RoundPrize = require(script.Parent.RoundPrize)
 local Profile = require(script.Parent.Profile)
 local ProfileStore = require(script.Parent.ProfileStore)
@@ -13,20 +14,20 @@ local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
 
 local petCatalog = {}
 for _, vault in ipairs(Rules.Vaults) do
-    for _, pet in pairs(vault.pets) do
+    for _, pet in ipairs(vault.pets) do
         petCatalog[pet.id] = pet
     end
 end
 
-for _, pet in ipairs(Rules.RelicPets) do
-    petCatalog[pet.id] = pet
+for _, prize in ipairs(Rules.Prizes) do
+    for _, pet in ipairs(prize.pets) do
+        petCatalog[pet.id] = pet
+    end
 end
 
-local recipesByOffspring = {}
-for _, recipe in ipairs(Rules.BreedingRecipes) do
-    local pet = recipe.offspring
-    petCatalog[pet.id] = pet
-    recipesByOffspring[pet.id] = recipe
+local recipesByPair, recipesByOffspring = Nursery.recipes(Rules)
+for offspringId, recipe in pairs(recipesByOffspring) do
+    petCatalog[offspringId] = recipe.offspring
 end
 
 local weeklyGroup = "EggstrideWeeklyRunners"
@@ -206,7 +207,11 @@ local function showPet(root, pet, stormTrailUnlocked)
         previous:Destroy()
     end
     local accent = World.variantColor(pet)
-    local body = accessory(root, "EggstridePet", accent, Vector3.new(1.9, 1.45, 1.7), Vector3.new(2.6, 0, 2.4))
+    local bodySize = if pet.form == "shell" then Vector3.new(2.04, 1.22, 1.86)
+        elseif pet.form == "fins" then Vector3.new(2.02, 1.08, 1.84)
+        elseif pet.form == "crest" then Vector3.new(1.66, 1.58, 1.46)
+        else Vector3.new(1.9, 1.45, 1.7)
+    local body = accessory(root, "EggstridePet", accent, bodySize, Vector3.new(2.6, 0, 2.4))
     for _, x in ipairs({ -0.43, 0.43 }) do
         accessory(body, "Eye", Color3.fromRGB(46, 40, 61), Vector3.new(0.21, 0.27, 0.21), Vector3.new(x, 0.1, -0.72))
         if pet.form == "wings" or pet.form == "fins" then
@@ -215,12 +220,24 @@ local function showPet(root, pet, stormTrailUnlocked)
         elseif pet.form == "horns" then
             accessory(body, "Horn", accent:Lerp(Color3.new(1, 1, 1), 0.55),
                 Vector3.new(0.24, 0.97, 0.3), Vector3.new(x * 1.35, 0.78, -0.16))
-        else
+        elseif pet.form == "frill" or pet.form == "ribbon" then
+            accessory(body, "Frill", accent:Lerp(Color3.new(1, 1, 1), 0.35),
+                if pet.form == "frill" then Vector3.new(0.75, 0.72, 0.32) else Vector3.new(0.31, 0.48, 1.15),
+                Vector3.new(x * 1.9, 0.3, 0.08))
+        elseif pet.form ~= "shell" and pet.form ~= "crest" and pet.form ~= "spring" then
             accessory(body, "Ear", accent, Vector3.new(0.44, 0.78, 0.47), Vector3.new(x * 1.55, 0.67, 0.05))
         end
     end
     if pet.form == "tail" then
         accessory(body, "Tail", accent, Vector3.new(0.55, 0.62, 1.65), Vector3.new(0, 0.2, 1.15))
+    end
+    local trim = accent:Lerp(Color3.new(1, 1, 1), 0.4)
+    if pet.form == "shell" then
+        accessory(body, "Shell", trim, Vector3.new(1.43, 0.98, 1.4), Vector3.new(0, 0.49, 0.27))
+    elseif pet.form == "crest" then
+        accessory(body, "Crest", trim, Vector3.new(0.38, 1.08, 0.85), Vector3.new(0, 0.72, 0.05))
+    elseif pet.form == "spring" then
+        accessory(body, "Pom", trim, Vector3.new(0.72, 0.72, 0.72), Vector3.new(0, 0.31, 1.04))
     end
     if stormTrailUnlocked then
         local top = Instance.new("Attachment")
@@ -319,6 +336,7 @@ local function join(player)
         deliveries = record.deliveries,
         prizeWins = record.prizeWins,
         materials = record.materials,
+        discoveries = record.discoveries,
         weeklyRecord = record.weeklyRecord,
         weeklyRewardWeek = record.weeklyRewardWeek,
         tier = record.tier,
@@ -331,6 +349,10 @@ local function join(player)
     for id in pairs(record.owned) do
         entry.ownedPets[id] = petCatalog[id]
         player:SetAttribute("OwnsPet_" .. id, true)
+    end
+    for id in pairs(entry.discoveries) do
+        local parents = recipesByOffspring[id].parents
+        player:SetAttribute("Recipe_" .. id, parents[1].name .. " + " .. parents[2].name)
     end
     for id, time in pairs(record.deliveryRecords) do
         player:SetAttribute("DeliveryRecord_" .. id, time)
@@ -569,9 +591,9 @@ local function hatch(player, entry, root, secondsLeft, now)
     clearEgg(player, entry)
     entry.delivered = true
     entry.coins += vault.coins + bonus
-    local pet = if awardedPrize and definition.id == "storm" then
-        Loot.relicPetForRoll(Rules.RelicPets, random:NextInteger(1, 1000))
-        else Loot.hatchForRoll(vault, egg, random:NextInteger(1, 100))
+    local pet = if awardedPrize then
+        Loot.prizePetForRoll(definition.pets, random:NextInteger(1, 1000))
+        else Loot.hatchForRoll(vault, egg, random:NextInteger(1, 10000))
     local prizeId = if awardedPrize then definition.id else nil
     local isNew, materialGain = Profile.recordHatch(entry, vault, pet, prizeId)
     publishBiomeProgress(player, entry, vault.id)
@@ -626,7 +648,7 @@ local function syncRound()
         wasOpen = open
         if open then
             for _, definition in ipairs(Rules.Prizes) do
-                showPrize(definition, true, if definition.id == "storm" then "Реликвия на Грозовом" else "Приз на Янтарном")
+                showPrize(definition, true, "Приз на " .. definition.location)
             end
         end
         map.gate.CanCollide = not open
@@ -858,10 +880,12 @@ updatePreference.OnServerEvent:Connect(function(player, attribute, value)
     end
 end)
 
-breedPet.OnServerEvent:Connect(function(player, offspringId)
+breedPet.OnServerEvent:Connect(function(player, firstId, secondId)
     local entry = entries[player]
     if closing or not entry or entry.weekly or ProfileStore.expired(entry.session)
-        or typeof(offspringId) ~= "string" or #offspringId > 32 then
+        or typeof(firstId) ~= "string" or #firstId > 32
+        or typeof(secondId) ~= "string" or #secondId > 32 or firstId == secondId
+        or not entry.ownedPets[firstId] or not entry.ownedPets[secondId] then
         return
     end
 
@@ -871,12 +895,23 @@ breedPet.OnServerEvent:Connect(function(player, offspringId)
     end
     entry.nextBreedAt = now + 0.25
 
-    local recipe = recipesByOffspring[offspringId]
-    if recipe and Profile.breed(entry, recipe) then
-        local vaultId = recipe.vault.id
-        player:SetAttribute("OwnsPet_" .. offspringId, true)
-        player:SetAttribute("Material_" .. vaultId, entry.materials[vaultId])
-        publish(player, entry, "В питомнике появился новый питомец: " .. recipe.offspring.name .. ".")
+    local recipe = Nursery.find(recipesByPair, firstId, secondId)
+    if not recipe then
+        breedPet:FireClient(player, firstId, secondId, "miss")
+        return
+    end
+    local offspring = recipe.offspring
+    local vaultId = recipe.vault.id
+    if entry.discoveries[offspring.id] then
+        breedPet:FireClient(player, firstId, secondId, "known", offspring.name)
+    elseif Profile.breed(entry, recipe) then
+        local parents = recipe.parents
+        player:SetAttribute("OwnsPet_" .. offspring.id, true)
+        player:SetAttribute("Material_" .. vaultId, entry.materials[vaultId] or 0)
+        player:SetAttribute("Recipe_" .. offspring.id, parents[1].name .. " + " .. parents[2].name)
+        breedPet:FireClient(player, firstId, secondId, "found", offspring.name)
+    else
+        breedPet:FireClient(player, firstId, secondId, "materials")
     end
 end)
 

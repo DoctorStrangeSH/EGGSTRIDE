@@ -342,7 +342,7 @@ function World.build(rules)
     local prizes = {}
     for _, definition in ipairs(rules.Prizes) do
         local vault = rules.Vaults[definition.vaultIndex]
-        local x, z = vault.x + 5, if definition.id == "storm" then 18 else -18
+        local x, z = vault.x + 5, if definition.id == "amber" then -18 else 18
         local accent = World.VaultColors[definition.vaultIndex]
         local pedestal = part(scene, definition.name, Vector3.new(6, 1, 6),
             Vector3.new(x, 0.5, z), accent, false)

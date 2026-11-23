@@ -206,7 +206,7 @@ local function update()
     stats.Text = string.format("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
     local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm")
         elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber")
-        else "Луговое яйцо доступно каждому"
+        else round:GetAttribute("PrizeStatus_meadow") or "Луговое яйцо доступно каждому"
     objective.Text = if carrying and ability then ability.hint
         elseif carrying then "К инкубатору"
         elseif player:GetAttribute("Delivered") then "Яйцо спасено"
