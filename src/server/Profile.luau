@@ -35,6 +35,9 @@ function Profile.read(stored, catalog, rules)
             end
         end
     end
+    if wholeNumber(stored.weeklyRewardWeek, 0, 9e15) then
+        record.weeklyRewardWeek = stored.weeklyRewardWeek
+    end
     local weekly = stored.weeklyRecord
     if type(weekly) == "table" and wholeNumber(weekly.week, 0, 9e15)
         and wholeNumber(weekly.time, 1, rules.Weekly.duration * 1000) then
@@ -69,6 +72,7 @@ function Profile.snapshot(entry)
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true
     record.deliveryRecords = table.clone(entry.deliveryRecords)
     record.weeklyRecord = entry.weeklyRecord
+    record.weeklyRewardWeek = entry.weeklyRewardWeek
     record.onboarding = entry.onboarding
     for id in pairs(entry.ownedPets) do
         record.owned[id] = true

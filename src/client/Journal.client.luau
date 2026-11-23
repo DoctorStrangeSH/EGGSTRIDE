@@ -142,7 +142,7 @@ trialPadding.PaddingRight = UDim.new(0, 10)
 local weekly = textItem("TextLabel", list, "", 13, palette.text)
 weekly.Name = "WeeklyBest"
 weekly.LayoutOrder = 1
-weekly.Size = UDim2.new(1, -8, 0, 46)
+weekly.Size = UDim2.new(1, -8, 0, 62)
 weekly.TextWrapped = true
 fill(weekly, palette.row, 10)
 
@@ -234,8 +234,12 @@ end
 local function update()
     local equipped = player:GetAttribute("EquippedPetId")
     local time = player:GetAttribute("WeeklyBest")
-    weekly.Text = if time then "Рекорд недели · " .. Rules.deliveryTimeText(time)
+    local heading = if time then "Рекорд недели · " .. Rules.deliveryTimeText(time)
         else "Забег недели · вход в лагере"
+    local reward = if player:GetAttribute("WeeklyRewardClaimed") then "Награда недели получена"
+        else string.format("Награда: %d монет за зачётный финиш ≤ %d сек.",
+            Rules.Weekly.rewardCoins, Rules.Weekly.rewardTime / 1000)
+    weekly.Text = heading .. "\n" .. reward
     if player:GetAttribute("StormTrailUnlocked") then
         trial.Text = Rules.StormTrial.name .. "\nОткрыт и применён к спутнику"
     else
@@ -265,6 +269,7 @@ end
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)
 player:GetAttributeChangedSignal("WeeklyBest"):Connect(update)
+player:GetAttributeChangedSignal("WeeklyRewardClaimed"):Connect(update)
 player:GetAttributeChangedSignal("StormTrailUnlocked"):Connect(update)
 for vault in pairs(recordLabels) do
     player:GetAttributeChangedSignal("DeliveryRecord_" .. vault.id):Connect(update)

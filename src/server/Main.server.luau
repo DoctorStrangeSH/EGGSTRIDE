@@ -264,6 +264,7 @@ local function join(player)
         stormTrailUnlocked = record.stormTrailUnlocked,
         deliveryRecords = record.deliveryRecords,
         weeklyRecord = record.weeklyRecord,
+        weeklyRewardWeek = record.weeklyRewardWeek,
         tier = record.tier,
         pet = petCatalog[record.equipped],
         delivered = false,
@@ -279,6 +280,7 @@ local function join(player)
     end
     local week = Rules.weekId(os.time())
     player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
+    player:SetAttribute("WeeklyRewardClaimed", (entry.weeklyRewardWeek or -1) >= week)
     if entry.weeklyRecord and entry.weeklyRecord.week == week and entry.weeklyRecord.rankedTime then
         task.defer(weeklyLeaderboard.submit, weeklyLeaderboard, player.UserId, player.Name, week, entry.weeklyRecord.rankedTime)
     end
@@ -440,11 +442,15 @@ local function finishWeekly(player, entry, root, now, week, completed)
     local message = if best then "Личный рекорд недели · " else "Забег завершён · "
     local qualification = if attempt.rankable then "" else " · вне рейтинга"
     local milliseconds = math.round(elapsed * 1000)
+    local rewardCoins = Rules.claimWeeklyReward(entry, week, milliseconds, attempt.rankable)
+    if rewardCoins then
+        player:SetAttribute("WeeklyRewardClaimed", true)
+    end
     publish(player, entry, message .. Rules.deliveryTimeText(milliseconds) .. qualification)
     local result = if not attempt.rankable then "Вне рейтинга"
         elseif rankedBest then "Допущен к рейтингу"
         else "В рейтинге остаётся лучшее время"
-    runFeedback:FireClient(player, "WeeklyFinish", milliseconds, best ~= nil, result)
+    runFeedback:FireClient(player, "WeeklyFinish", milliseconds, best ~= nil, result, rewardCoins)
 end
 
 local displayedWeek
@@ -497,6 +503,7 @@ local function syncRound()
         local humanoid, root = characterParts(player)
         if weekChanged then
             player:SetAttribute("WeeklyBest", Rules.weeklyBest(entry.weeklyRecord, week))
+            player:SetAttribute("WeeklyRewardClaimed", (entry.weeklyRewardWeek or -1) >= week)
         end
         local attempt = entry.weekly
         if attempt and root and humanoid and humanoid.Health > 0 then

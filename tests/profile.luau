@@ -21,7 +21,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 
 local pet = catalog.dew_moth
 local entry = {
-    coins = 77, tier = 2, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
+    coins = 77, tier = 2, weeklyRewardWeek = 20, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
     onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200 }, delivered = true, egg = Rules.Vaults[1].eggs[1],
 }
 local snapshot = Profile.snapshot(entry)
@@ -42,6 +42,8 @@ local rejoined = Profile.acquire(released, "server_c", 331, catalog, Rules)
 assert(rejoined.equipped == pet.id and rejoined.coins == 77 and rejoined.tier == 2 and rejoined.onboarding == 3 and rejoined.stormTrailUnlocked)
 
 assert(rejoined.deliveryRecords.meadow == 8420)
+assert(rejoined.weeklyRewardWeek == 20)
+assert(Rules.claimWeeklyReward(rejoined, 20, Rules.Weekly.rewardTime, true) == nil and rejoined.coins == 77)
 assert(rejoined.muteRunSounds == true and rejoined.reduceCardMotion == true)
 assert(rejoined.weeklyRecord.week == 20 and rejoined.weeklyRecord.time == 14320
     and rejoined.weeklyRecord.rankedTime == 15200)
@@ -68,7 +70,9 @@ local sanitized = Profile.read(snapshot, catalog, Rules)
 assert(sanitized.muteRunSounds == false and sanitized.reduceCardMotion == false)
 snapshot.equipped = "unknown_pet"
 snapshot.owned.unknown_pet = true
+snapshot.weeklyRewardWeek = -1
 local normalized = Profile.read(snapshot, catalog, Rules)
+assert(normalized.weeklyRewardWeek == nil)
 assert(normalized.equipped == pet.id and normalized.owned.unknown_pet == nil)
 snapshot.version = Profile.VERSION + 1
 local invalid, invalidReason = Profile.acquire(snapshot, "server_c", 400, catalog, Rules)

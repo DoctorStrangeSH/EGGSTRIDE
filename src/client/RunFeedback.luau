@@ -111,9 +111,13 @@ function RunFeedback.connect(gui, event, rules, player)
             hatchSound.PlaybackSpeed = if rarity == "Редкий" then 1.28 else 1.10
             play(hatchSound)
         elseif kind == "WeeklyFinish" then
-            local milliseconds, isBest, result = ...
+            local milliseconds, isBest, result, rewardCoins = ...
             local heading = if isBest then "Личный рекорд недели" else "Забег завершён"
-            show(heading, rules.deliveryTimeText(milliseconds) .. " · " .. result, Color3.fromRGB(255, 209, 117))
+            local description = rules.deliveryTimeText(milliseconds) .. " · " .. result
+            if rewardCoins then
+                description ..= "\nНаграда недели · +" .. rewardCoins .. " монет"
+            end
+            show(heading, description, Color3.fromRGB(255, 209, 117))
             play(hatchSound)
         elseif kind == "WeeklyCancelled" then
             show("Попытка отменена", "Ты вернулся в лагерь.", Color3.fromRGB(255, 209, 117))

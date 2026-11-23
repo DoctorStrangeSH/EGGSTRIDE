@@ -3,6 +3,7 @@ local Rules = {}
 Rules.PrepareSeconds = 9
 Rules.RunSeconds = 25
 Rules.Weekly = {
+    rewardCoins = 75, rewardTime = 20000,
     countdown = 3, duration = 35, tier = 2, checkpointRadius = 6, eggStep = 3,
     order = { "First", "Second", "Egg", "Second", "First", "Finish" },
     labels = { "Добеги до метки 1", "Добеги до метки 2", "Забери тренировочное яйцо",
@@ -108,6 +109,17 @@ function Rules.weeklySplitPlausible(distance, elapsed, carrying)
     local lowerBound = math.max(0, distance - 2 * Rules.Weekly.checkpointRadius)
     local pace = Rules.speed(Rules.Weekly.tier, carrying)
     return elapsed + 0.3 >= lowerBound / (pace * 1.2)
+end
+
+function Rules.claimWeeklyReward(entry, week, milliseconds, rankable)
+    if not rankable or not (milliseconds >= 1 and milliseconds <= Rules.Weekly.rewardTime)
+        or (entry.weeklyRewardWeek and entry.weeklyRewardWeek >= week) then
+        return nil
+    end
+
+    entry.weeklyRewardWeek = week
+    entry.coins += Rules.Weekly.rewardCoins
+    return Rules.Weekly.rewardCoins
 end
 
 function Rules.weeklyBest(record, week)
