@@ -6,11 +6,15 @@ local WeeklyLeaderboard = {}
 WeeklyLeaderboard.__index = WeeklyLeaderboard
 
 local PAGE_SIZE = 10
+local LOADING = "Загружаем результаты…"
+local EMPTY = "Пока нет результатов"
+local UNAVAILABLE = "Таблица временно недоступна"
 
 function WeeklyLeaderboard.new(round, rules, locale)
     local feed = Instance.new("StringValue")
     feed.Name = "WeeklyLeaderboard"
-    feed.Value = "Загружаем результаты…"
+    feed.Value = LOADING
+    feed:SetAttribute("EnglishResults", locale.text("en", LOADING))
     feed.Parent = round
     local storeName
     if not RunService:IsStudio() then
@@ -29,12 +33,28 @@ function WeeklyLeaderboard:storeFor(week)
     return DataStoreService:GetOrderedDataStore(self.storeName, "week_" .. week)
 end
 
+function WeeklyLeaderboard:showStatus(status)
+    self.feed.Value = status
+    self.feed:SetAttribute("EnglishResults", self.locale.text("en", status))
+end
+
 function WeeklyLeaderboard:show(results)
-    local lines = {}
-    for index, result in ipairs(results) do
-        table.insert(lines, string.format("%d. %s  ·  %s", index, result.name, self.locale.deliveryTime("ru", result.time)))
+    if #results == 0 then
+        self:showStatus(EMPTY)
+        return
     end
-    self.feed.Value = if #lines > 0 then table.concat(lines, "\n") else "Пока нет результатов"
+
+    local function formatRows(language)
+        local lines = {}
+        for index, result in ipairs(results) do
+            local name = result.name or self.locale.text(language, "Игрок %s", result.id)
+            local time = self.locale.deliveryTime(language, result.time)
+            table.insert(lines, string.format("%d. %s  ·  %s", index, name, time))
+        end
+        return table.concat(lines, "\n")
+    end
+    self.feed.Value = formatRows("ru")
+    self.feed:SetAttribute("EnglishResults", formatRows("en"))
 end
 
 function WeeklyLeaderboard:refresh(week)
@@ -42,7 +62,7 @@ function WeeklyLeaderboard:refresh(week)
         self.week = week
         self.results = {}
         self.nextRefreshAt = 0
-        self.feed.Value = if self.storeName then "Загружаем результаты…" else "Пока нет результатов"
+        self:showStatus(if self.storeName then LOADING else EMPTY)
     end
     if not self.storeName or self.refreshing or os.clock() < self.nextRefreshAt then
         return
@@ -67,7 +87,7 @@ function WeeklyLeaderboard:refresh(week)
                         name = username
                     end
                 end
-                table.insert(results, { name = name or "Игрок " .. row.key, time = row.value })
+                table.insert(results, { name = name, id = row.key, time = row.value })
             end
         end
         self.refreshing = false
@@ -76,8 +96,8 @@ function WeeklyLeaderboard:refresh(week)
         end
         if ok then
             self:show(results)
-        elseif self.feed.Value == "Загружаем результаты…" then
-            self.feed.Value = "Таблица временно недоступна"
+        elseif self.feed.Value == LOADING then
+            self:showStatus(UNAVAILABLE)
         end
     end)
 end

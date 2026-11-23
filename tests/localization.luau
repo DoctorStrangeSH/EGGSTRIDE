@@ -11,6 +11,12 @@ assert(Locale.text("ru", "Монеты %d  ·  Скорость %d/%d", 15, 1, 5
 assert(Locale.text("en", "Доставил: %s", "Player%2") == "Prize delivered by Player%2")
 assert(Locale.text("en", "Русский текст") == "Русский текст")
 assert(Locale.text("en", "") == "")
+assert(Locale.text("en", "Коллекция %d/%d", 18, 107) == "Collection 18/107")
+assert(Locale.text("en", "Нужен питомец «%s»", "Sun Shell") == "Requires Sun Shell")
+assert(Locale.text("en", "Скрестить: %s", "Leaftail + Dewwing") == "Breed: Leaftail + Dewwing")
+assert(Locale.text("ru", "Скрестить: %s", "Листохвост + Росокрыл") == "Скрестить: Листохвост + Росокрыл")
+assert(Locale.text("en", "Игрок %s", "1234") == "Player 1234")
+assert(Locale.text("en", "Купить · %d R$", 99) == "Buy · 99 R$")
 
 assert(Locale.deliveryTime("ru", 10240) == "10,24 сек.")
 assert(Locale.deliveryTime("en", 10240) == "10.24s")
@@ -55,6 +61,20 @@ for _, group in ipairs(Rules.Offspring) do
 end
 for _, mutation in ipairs(Rules.Mutations) do
     checkPet(mutation.pet)
+    translated(mutation.route)
+    translated(mutation.appearance)
+end
+for _, items in ipairs({ Rules.Trails, Rules.HatchEffects, Rules.CampThemes }) do
+    for _, item in ipairs(items) do
+        translated(item.name)
+        if item.description then
+            translated(item.description)
+        end
+    end
+end
+translated(Rules.Season.name)
+for _, quest in ipairs(Rules.Season.quests) do
+    translated(quest.label)
 end
 for _, pet in ipairs(Rules.SeasonPets) do
     checkPet(pet)

@@ -13,7 +13,7 @@ local cosmeticShop = shared:WaitForChild("CosmeticShop")
 local HatchEffects = require(script.Parent.HatchEffects)
 local CampThemes = require(script.Parent.CampThemes)
 local locale = require(script.Parent.InterfaceLanguage)
-local Locale = require(shared:WaitForChild("Locale"))
+local tr = locale.text
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -31,6 +31,7 @@ local function textItem(className, parent, text, size, color)
     item.Text = text
     item.Font = Enum.Font.GothamBold
     item.TextSize = size
+    item.TextWrapped = true
     item.TextColor3 = color
     item.Parent = parent
     return item
@@ -44,6 +45,7 @@ end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "EggstrideJournal"
+gui.AutoLocalize = false
 gui.DisplayOrder = 2
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
@@ -51,8 +53,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 gui.Parent = playerGui
 
 local header = playerGui:WaitForChild("EggstrideHud"):WaitForChild("Status"):WaitForChild("Header")
-local open = textItem("TextButton", header, locale.text("Питомцы"), 13, palette.panel)
-open.AutoLocalize = false
+local open = textItem("TextButton", header, tr("Питомцы"), 13, palette.panel)
 open.AnchorPoint = Vector2.new(1, 0)
 open.Position = UDim2.fromScale(1, 0)
 open.Size = UDim2.fromOffset(102, 44)
@@ -75,13 +76,12 @@ panel.Parent = scrim
 fill(panel, palette.panel, 12)
 Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(440, 500)
 
-local title = textItem("TextLabel", panel, "Коллекция", 17, palette.text)
+local title = textItem("TextLabel", panel, tr("Коллекция"), 17, palette.text)
 title.Position = UDim2.fromOffset(12, 4)
 title.Size = UDim2.new(1, -108, 0, 44)
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.TextWrapped = true
 
-local close = textItem("TextButton", panel, "Закрыть", 13, palette.text)
+local close = textItem("TextButton", panel, tr("Закрыть"), 13, palette.text)
 close.AnchorPoint = Vector2.new(1, 0)
 close.Position = UDim2.new(1, -8, 0, 4)
 close.Size = UDim2.fromOffset(80, 44)
@@ -121,7 +121,7 @@ local layout = Instance.new("UIListLayout", list)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, 6)
 
-local settings = textItem("TextButton", list, "Настройки забега", 14, palette.panel)
+local settings = textItem("TextButton", list, tr("Настройки забега"), 14, palette.panel)
 settings.LayoutOrder = -3
 settings.Size = UDim2.new(1, -8, 0, 44)
 fill(settings, palette.gold, 10)
@@ -140,7 +140,7 @@ for index, option in ipairs({
 
     local function updateSetting()
         local value = player:GetAttribute(option.attribute)
-        control.Text = if value == nil then "Загрузка настроек…" elseif value then option.off else option.on
+        control.Text = tr(if value == nil then "Загрузка настроек…" elseif value then option.off else option.on)
         control.Active = value ~= nil
         control.Selectable = value ~= nil
     end
@@ -156,7 +156,7 @@ end
 
 settings.Activated:Connect(function()
     local expanded = not settingButtons[1].Visible
-    settings.Text = if expanded then "Скрыть настройки" else "Настройки забега"
+    settings.Text = if expanded then tr("Скрыть настройки") else tr("Настройки забега")
     for _, control in ipairs(settingButtons) do
         control.Visible = expanded
     end
@@ -168,7 +168,6 @@ local function description(name, order, color)
     label.LayoutOrder = order
     label.Size = UDim2.new(1, -8, 0, 0)
     label.AutomaticSize = Enum.AutomaticSize.Y
-    label.TextWrapped = true
     fill(label, palette.row, 9)
     local padding = Instance.new("UIPadding", label)
     padding.PaddingLeft = UDim.new(0, 8)
@@ -182,7 +181,6 @@ local function menuButton(caption, order)
     local button = textItem("TextButton", list, caption, 14, palette.panel)
     button.LayoutOrder = order
     button.Size = UDim2.new(1, -8, 0, 44)
-    button.TextWrapped = true
     fill(button, palette.gold, 10)
     return button
 end
@@ -198,6 +196,7 @@ local function nearCamp()
 end
 
 local function addCosmetics(caption, firstOrder, items, equippedAttribute)
+    caption = tr(caption)
     local shopButton = menuButton(caption .. "  +", firstOrder)
     local shopExpanded = false
     local shopCards = {}
@@ -206,7 +205,7 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
         local isCamp = item.slot == "camp"
         local order = shopButton.LayoutOrder + 1 + (index - 1) * 3
         local heading = description("CosmeticName_" .. item.id, order, palette.text)
-        heading.Text = if isCamp then item.name .. "\n" .. item.description else item.name
+        heading.Text = if isCamp then tr(item.name) .. "\n" .. tr(item.description) else tr(item.name)
 
         local swatch = Instance.new("Frame")
         swatch.LayoutOrder = order + 1
@@ -226,9 +225,8 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
         buttons.Size = UDim2.new(1, -8, 0, 44)
         buttons.Parent = list
 
-        local try = textItem("TextButton", buttons, if isTrail or isCamp then "Примерить · 12 с" else "Посмотреть", 13, palette.panel)
+        local try = textItem("TextButton", buttons, if isTrail or isCamp then tr("Примерить · 12 с") else tr("Посмотреть"), 13, palette.panel)
         try.Size = UDim2.new(0.44, -3, 1, 0)
-        try.TextWrapped = true
         fill(try, palette.mint, 10)
         try.Activated:Connect(function()
             if isTrail then
@@ -237,9 +235,9 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
                 updateLauncher()
             elseif isCamp then
                 if not nearCamp() then
-                    try.Text = "Вернись в лагерь"
+                    try.Text = tr("Вернись в лагерь")
                     task.delay(1.5, function()
-                        try.Text = "Примерить · 12 с"
+                        try.Text = tr("Примерить · 12 с")
                     end)
                     return
                 end
@@ -254,7 +252,6 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
         local action = textItem("TextButton", buttons, "", 13, palette.panel)
         action.Position = UDim2.new(0.44, 3, 0, 0)
         action.Size = UDim2.new(0.56, -3, 1, 0)
-        action.TextWrapped = true
         fill(action, palette.gold, 10)
 
         local price, productChecked, fetchingPrice, offsale
@@ -285,14 +282,14 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
             end
             local livePurchase = status == "locked" and productChecked and not offsale
             local enabled = status == "preview" or status == "owned" or status == "error" or livePurchase
-            action.Text = if status == "owned" then (if selected then "Снять" elseif isTrail then "Надеть" elseif isCamp then "Применить" else "Выбрать")
-                elseif status == "preview" then "Тестовая покупка"
-                elseif status == "locked" and offsale then "Вне продажи"
-                elseif livePurchase then (if price then "Купить · " .. price .. " R$" else "Купить за Robux")
-                elseif status == "prompting" then "Окно Roblox…"
-                elseif status == "error" then "Повторить проверку"
-                elseif status == "unavailable" then "Покупка недоступна"
-                else "Загрузка…"
+            action.Text = if status == "owned" then (if selected then tr("Снять") elseif isTrail then tr("Надеть") elseif isCamp then tr("Применить") else tr("Выбрать"))
+                elseif status == "preview" then tr("Тестовая покупка")
+                elseif status == "locked" and offsale then tr("Вне продажи")
+                elseif livePurchase then (if price then tr("Купить · %d R$", price) else tr("Купить за Robux"))
+                elseif status == "prompting" then tr("Окно Roblox…")
+                elseif status == "error" then tr("Повторить проверку")
+                elseif status == "unavailable" then tr("Покупка недоступна")
+                else tr("Загрузка…")
             action.Active = enabled
             action.Selectable = enabled
             action.AutoButtonColor = enabled
@@ -331,7 +328,7 @@ addCosmetics("Магазин следов", -60, Rules.Trails, "EquippedTrail")
 addCosmetics("Эффекты вылупления", -50, Rules.HatchEffects, "EquippedHatchEffect")
 
 local season = Rules.Season
-local seasonButton = menuButton("Сезон «" .. season.name .. "»  +", -40)
+local seasonButton = menuButton(tr("Сезон «%s»  %s", tr(season.name), "+"), -40)
 local seasonInfo = description("SeasonProgress", -39, palette.text)
 seasonInfo.TextXAlignment = Enum.TextXAlignment.Left
 local seasonExpanded = false
@@ -352,7 +349,7 @@ end
 local rewardButtons = addSeasonRewards(season.rewards, -38, false)
 local premiumInfo = description("PremiumTrack", -33, palette.text)
 premiumInfo.TextXAlignment = Enum.TextXAlignment.Left
-premiumInfo.Text = "Косметическая дорожка\nТри расцветки светляка за тот же сезонный опыт."
+premiumInfo.Text = tr("Косметическая дорожка\nТри расцветки светляка за тот же сезонный опыт.")
 local premiumAction = menuButton("", -32)
 local premiumButtons = addSeasonRewards(season.premiumRewards, -31, true)
 premiumAction.Activated:Connect(function()
@@ -366,9 +363,9 @@ local function updateRewardButtons(rewards, buttons, xp, prefix, access)
         local action = buttons[index]
         local claimed = player:GetAttribute(prefix .. index) == true
         local available = xp ~= nil and xp >= reward.xp and not claimed and access
-        local status = if claimed then "Получено" elseif available then "Забрать"
-            elseif not access then reward.xp .. " XP + пропуск" else reward.xp .. " XP"
-        action.Text = string.format("%s · %s", reward.label, status)
+        local status = if claimed then tr("Получено") elseif available then tr("Забрать")
+            elseif not access then tr("%d XP + пропуск", reward.xp) else reward.xp .. " XP"
+        action.Text = string.format("%s · %s", tr(reward.label), status)
         action.Visible = seasonExpanded
         action.Active = available
         action.Selectable = available
@@ -380,27 +377,27 @@ end
 local function updateSeason()
     local xp = player:GetAttribute("SeasonXP")
     local maximum = season.rewards[#season.rewards].xp
-    seasonButton.Text = string.format("Сезон «%s»  %s", season.name, if seasonExpanded then "−" else "+")
+    seasonButton.Text = tr("Сезон «%s»  %s", tr(season.name), if seasonExpanded then "−" else "+")
     seasonInfo.Visible = seasonExpanded
     local lines = {}
     if xp ~= nil then
-        table.insert(lines, string.format("Опыт сезона · %d/%d", xp, maximum))
-        table.insert(lines, "Задания обновляются по понедельникам в 00:00 UTC.")
+        table.insert(lines, tr("Опыт сезона · %d/%d", xp, maximum))
+        table.insert(lines, tr("Задания обновляются по понедельникам в 00:00 UTC."))
         for _, quest in ipairs(season.quests) do
             local count = player:GetAttribute("SeasonQuest_" .. quest.id) or 0
-            table.insert(lines, string.format("%s · %d/%d · +%d XP", quest.label, count, quest.goal, quest.xp))
+            table.insert(lines, string.format("%s · %d/%d · +%d XP", tr(quest.label), count, quest.goal, quest.xp))
         end
         local times = {}
         for _, vault in ipairs(Rules.Vaults) do
             local best = player:GetAttribute("SeasonDeliveryBest_" .. vault.id)
             if best then
-                table.insert(times, vault.name .. " · " .. Locale.deliveryTime("ru", best))
+                table.insert(times, tr(vault.name) .. " · " .. locale.deliveryTime(best))
             end
         end
-        table.insert(lines, if #times > 0 then "Лучшие доставки недели\n" .. table.concat(times, "\n")
-            else "Первая доставка в биоме задаёт время для сравнения.")
+        table.insert(lines, if #times > 0 then tr("Лучшие доставки недели") .. "\n" .. table.concat(times, "\n")
+            else tr("Первая доставка в биоме задаёт время для сравнения."))
     else
-        table.insert(lines, "Загружаем прогресс сезона…")
+        table.insert(lines, tr("Загружаем прогресс сезона…"))
     end
     seasonInfo.Text = table.concat(lines, "\n\n")
     local status = player:GetAttribute("SeasonPremiumStatus")
@@ -408,14 +405,14 @@ local function updateSeason()
     local actionable = status == "preview" or status == "locked" or status == "error"
     premiumInfo.Visible = seasonExpanded
     premiumAction.Visible = seasonExpanded
-    premiumAction.Text = if status == "preview" then "Включить тестовый пропуск"
-        elseif status == "previewOwned" then "Тестовый пропуск активен"
-        elseif status == "owned" then "Пропуск активен"
-        elseif status == "locked" then "Купить пропуск за Robux"
-        elseif status == "error" then "Повторить проверку пропуска"
-        elseif status == "unavailable" then "Пропуск пока недоступен"
-        elseif status == "prompting" then "Покупка в окне Roblox…"
-        else "Проверяем пропуск…"
+    premiumAction.Text = if status == "preview" then tr("Включить тестовый пропуск")
+        elseif status == "previewOwned" then tr("Тестовый пропуск активен")
+        elseif status == "owned" then tr("Пропуск активен")
+        elseif status == "locked" then tr("Купить пропуск за Robux")
+        elseif status == "error" then tr("Повторить проверку пропуска")
+        elseif status == "unavailable" then tr("Пропуск пока недоступен")
+        elseif status == "prompting" then tr("Покупка в окне Roblox…")
+        else tr("Проверяем пропуск…")
     premiumAction.Active = actionable
     premiumAction.Selectable = actionable
     premiumAction.AutoButtonColor = actionable
@@ -444,7 +441,7 @@ for index in ipairs(season.premiumRewards) do
 end
 updateSeason()
 
-local mutationsButton = menuButton("Мутации  +", -20)
+local mutationsButton = menuButton(tr("Мутации  +"), -20)
 local mutationCards = {}
 local mutationsExpanded = false
 
@@ -465,15 +462,15 @@ for index, mutation in ipairs(Rules.Mutations) do
         local owned = player:GetAttribute(ownedAttribute) == true
         local hasParent = player:GetAttribute(parentAttribute) == true
         local canMutate = not owned and hasParent and stock ~= nil and stock >= mutation.cost
-        info.Text = mutation.pet.name .. "\n" .. mutation.appearance
+        info.Text = tr(mutation.pet.name) .. "\n" .. tr(mutation.appearance)
         if not owned then
-            info.Text ..= "\n" .. mutation.route .. "\n"
-                .. string.format("Катализаторы · %d/%d", stock or 0, mutation.cost)
+            info.Text ..= "\n" .. tr(mutation.route) .. "\n"
+                .. tr("Катализаторы · %d/%d", stock or 0, mutation.cost)
         end
-        action.Text = if owned then "В коллекции"
-            elseif not hasParent then "Нужен питомец «" .. mutation.parent.name .. "»"
-            elseif not canMutate then "Нужны катализаторы"
-            else "Открыть форму"
+        action.Text = if owned then tr("В коллекции")
+            elseif not hasParent then tr("Нужен питомец «%s»", tr(mutation.parent.name))
+            elseif not canMutate then tr("Нужны катализаторы")
+            else tr("Открыть форму")
         action.Active = canMutate
         action.Selectable = canMutate
         action.AutoButtonColor = canMutate
@@ -493,16 +490,16 @@ end
 
 mutationsButton.Activated:Connect(function()
     mutationsExpanded = not mutationsExpanded
-    mutationsButton.Text = if mutationsExpanded then "Мутации  −" else "Мутации  +"
+    mutationsButton.Text = if mutationsExpanded then tr("Мутации  −") else tr("Мутации  +")
     for _, card in ipairs(mutationCards) do
         card.info.Visible = mutationsExpanded
         card.action.Visible = mutationsExpanded
     end
 end)
 
-local nurseryButton = menuButton("Питомник  +", -12)
+local nurseryButton = menuButton(tr("Питомник  +"), -12)
 local biomeButton = menuButton("", -11)
-local experiment = menuButton("Проверить пару", -10)
+local experiment = menuButton(tr("Проверить пару"), -10)
 local nurseryInfo = description("Experiment", -9, palette.text)
 nurseryInfo.TextXAlignment = Enum.TextXAlignment.Left
 local choices = Instance.new("Frame")
@@ -548,21 +545,21 @@ local function updateNursery()
             count += 1
         end
     end
-    nurseryButton.Text = if nurseryExpanded then "Питомник  −" else "Питомник  +"
-    biomeButton.Text = string.format("%s · сменить биом", vault.name)
+    nurseryButton.Text = if nurseryExpanded then tr("Питомник  −") else tr("Питомник  +")
+    biomeButton.Text = tr("%s · сменить биом", tr(vault.name))
     experiment.Active = canExperiment
     experiment.Selectable = canExperiment
     experiment.AutoButtonColor = canExperiment
     experiment.BackgroundColor3 = if canExperiment then palette.gold else palette.muted
-    local text = if count < 2 then "Вылупи двух разных питомцев из обычных яиц этого биома."
-        elseif first and second then first.name .. " + " .. second.name
-        elseif first then first.name .. " + выбери второго родителя"
-        else "Выбери двух родителей. Неподходящая пара не расходует материалы."
+    local guidance = if count < 2 then tr("Вылупи двух разных питомцев из обычных яиц этого биома.")
+        elseif first and second then tr(first.name) .. " + " .. tr(second.name)
+        elseif first then tr("%s + выбери второго родителя", tr(first.name))
+        else tr("Выбери двух родителей. Неподходящая пара не расходует материалы.")
     if result then
-        text ..= "\n" .. result.text
+        guidance ..= "\n" .. result.text
     end
     local stock = player:GetAttribute("Material_" .. vault.id)
-    nurseryInfo.Text = text .. "\n" .. string.format("%s · %d/%d", vault.material, stock or 0, biomeIndex + 1)
+    nurseryInfo.Text = guidance .. "\n" .. string.format("%s · %d/%d", tr(vault.material), stock or 0, biomeIndex + 1)
     biomeButton.Visible = nurseryExpanded
     nurseryInfo.Visible = nurseryExpanded
     experiment.Visible = nurseryExpanded
@@ -571,8 +568,7 @@ end
 
 for index, vault in ipairs(Rules.Vaults) do
     for position, pet in ipairs(vault.pets) do
-        local button = textItem("TextButton", choices, pet.name, 13, palette.panel)
-        button.TextWrapped = true
+        local button = textItem("TextButton", choices, tr(pet.name), 13, palette.panel)
         button.LayoutOrder = position
         fill(button, palette.muted, 8)
         button.Activated:Connect(function()
@@ -613,16 +609,16 @@ experiment.Activated:Connect(function()
 end)
 breedPet.OnClientEvent:Connect(function(firstId, secondId, status, name)
     local key = pairKey(firstId, secondId)
-    local message = if status == "found" then "Открытие: " .. name .. ". Пара записана в дневнике."
-        elseif status == "known" then "Эта пара уже в дневнике: " .. name
-        elseif status == "miss" then "Пара не подошла. Попробуй другую."
-        else "Этой паре нужны материалы."
+    local message = if status == "found" then tr("Открытие: %s. Пара записана в дневнике.", tr(name))
+        elseif status == "known" then tr("Эта пара уже в дневнике: %s", tr(name))
+        elseif status == "miss" then tr("Пара не подошла. Попробуй другую.")
+        else tr("Этой паре нужны материалы.")
     tested[key] = { text = message, finished = status ~= "materials" }
     updateNursery()
 end)
 updateNursery()
 
-local progressButton = textItem("TextButton", list, "Статистика и материалы  +", 14, palette.panel)
+local progressButton = textItem("TextButton", list, tr("Статистика и материалы  +"), 14, palette.panel)
 progressButton.LayoutOrder = -5
 progressButton.Size = UDim2.new(1, -8, 0, 44)
 fill(progressButton, palette.gold, 10)
@@ -636,7 +632,7 @@ local function updateProgress()
         return
     end
     if player:GetAttribute("Deliveries_" .. Rules.Vaults[1].id) == nil then
-        progress.Text = "Загружаем статистику…"
+        progress.Text = tr("Загружаем статистику…")
         return
     end
 
@@ -645,24 +641,24 @@ local function updateProgress()
         local deliveries = player:GetAttribute("Deliveries_" .. vault.id) or 0
         local materials = player:GetAttribute("Material_" .. vault.id) or 0
         local record = player:GetAttribute("DeliveryRecord_" .. vault.id)
-        local heading = string.format("%s · доставок %d", vault.name, deliveries)
+        local heading = tr("%s · доставок %d", tr(vault.name), deliveries)
         if record then
-            heading ..= " · рекорд " .. Locale.deliveryTime("ru", record)
+            heading ..= tr(" · рекорд %s", locale.deliveryTime(record))
         end
-        table.insert(sections, heading .. "\n" .. string.format("%s · %d", vault.material, materials))
+        table.insert(sections, heading .. "\n" .. string.format("%s · %d", tr(vault.material), materials))
     end
     local wins = {}
     for _, prize in ipairs(Rules.Prizes) do
         local count = player:GetAttribute("PrizeWins_" .. prize.id) or 0
-        table.insert(wins, string.format("%s · %d", prize.name, count))
+        table.insert(wins, string.format("%s · %d", tr(prize.name), count))
     end
-    table.insert(sections, "Доставлено призов\n" .. table.concat(wins, "\n"))
+    table.insert(sections, tr("Доставлено призов") .. "\n" .. table.concat(wins, "\n"))
     progress.Text = table.concat(sections, "\n\n")
 end
 
 progressButton.Activated:Connect(function()
     progress.Visible = not progress.Visible
-    progressButton.Text = if progress.Visible then "Статистика и материалы  −" else "Статистика и материалы  +"
+    progressButton.Text = if progress.Visible then tr("Статистика и материалы  −") else tr("Статистика и материалы  +")
     updateProgress()
 end)
 
@@ -680,7 +676,7 @@ local weekly = description("WeeklyBest", 1, palette.text)
 
 local round = shared:WaitForChild("Round")
 local leaderboardFeed = round:WaitForChild("WeeklyLeaderboard")
-local boardButton = textItem("TextButton", list, "Показать топ недели", 13, palette.panel)
+local boardButton = textItem("TextButton", list, tr("Показать топ недели"), 13, palette.panel)
 boardButton.LayoutOrder = 2
 boardButton.Size = UDim2.new(1, -8, 0, 44)
 fill(boardButton, palette.gold, 10)
@@ -689,15 +685,20 @@ board.Visible = false
 
 boardButton.Activated:Connect(function()
     board.Visible = not board.Visible
-    boardButton.Text = if board.Visible then "Скрыть топ недели" else "Показать топ недели"
+    boardButton.Text = if board.Visible then tr("Скрыть топ недели") else tr("Показать топ недели")
 end)
 
 local function updateBoard()
     local titleText = if leaderboardFeed:GetAttribute("SessionOnly") then "Рейтинг тестовой сессии" else "Общий рейтинг недели"
-    board.Text = titleText .. "\n" .. leaderboardFeed.Value
+    local results = if locale.language == "en" then leaderboardFeed:GetAttribute("EnglishResults") else leaderboardFeed.Value
+    board.Text = tr(titleText) .. "\n" .. (results or tr("Загружаем результаты…"))
 end
 
-leaderboardFeed:GetPropertyChangedSignal("Value"):Connect(updateBoard)
+if locale.language == "en" then
+    leaderboardFeed:GetAttributeChangedSignal("EnglishResults"):Connect(updateBoard)
+else
+    leaderboardFeed:GetPropertyChangedSignal("Value"):Connect(updateBoard)
+end
 leaderboardFeed:GetAttributeChangedSignal("SessionOnly"):Connect(updateBoard)
 updateBoard()
 
@@ -710,7 +711,7 @@ local function addPetRow(group, pet, source, secret)
     row.Name = pet.id
     order += 1
     row.LayoutOrder = order
-    row.Size = UDim2.new(1, -8, 0, 0)
+    row.Size = UDim2.new(1, -8, 0, 60)
     row.AutomaticSize = Enum.AutomaticSize.Y
     row.Parent = list
     fill(row, palette.row, 10)
@@ -728,18 +729,16 @@ local function addPetRow(group, pet, source, secret)
     copyLayout.SortOrder = Enum.SortOrder.LayoutOrder
     copyLayout.Padding = UDim.new(0, 2)
 
-    local name = textItem("TextLabel", copy, pet.name, 14, palette.text)
+    local name = textItem("TextLabel", copy, tr(pet.name), 14, palette.text)
     name.Size = UDim2.new(1, 0, 0, 0)
     name.AutomaticSize = Enum.AutomaticSize.Y
-    name.TextWrapped = true
     name.TextXAlignment = Enum.TextXAlignment.Left
 
-    local details = textItem("TextLabel", copy, source, 12, palette.muted)
+    local details = textItem("TextLabel", copy, tr(source), 12, palette.muted)
     details.LayoutOrder = 1
     details.Size = UDim2.new(1, 0, 0, 0)
     details.AutomaticSize = Enum.AutomaticSize.Y
     details.TextXAlignment = Enum.TextXAlignment.Left
-    details.TextWrapped = true
 
     local action = textItem("TextButton", row, "", 12, palette.panel)
     action.AnchorPoint = Vector2.new(1, 0)
@@ -796,17 +795,17 @@ end
 update = function()
     local equipped = player:GetAttribute("EquippedPetId")
     local time = player:GetAttribute("WeeklyBest")
-    local heading = if time then "Рекорд недели · " .. Locale.deliveryTime("ru", time)
-        else "Забег недели · вход в лагере"
-    local reward = if player:GetAttribute("WeeklyRewardClaimed") then "Награда недели получена"
-        else string.format("Награда: %d монет за зачётный финиш ≤ %d сек.",
+    local heading = if time then tr("Рекорд недели · %s", locale.deliveryTime(time))
+        else tr("Забег недели · вход в лагере")
+    local reward = if player:GetAttribute("WeeklyRewardClaimed") then tr("Награда недели получена")
+        else tr("Награда: %d монет за зачётный финиш ≤ %d сек.",
             Rules.Weekly.rewardCoins, Rules.Weekly.rewardTime / 1000)
     weekly.Text = heading .. "\n" .. reward
     if player:GetAttribute("StormTrailUnlocked") then
-        trial.Text = Rules.StormTrial.name .. "\nОткрыт и применён к спутнику"
+        trial.Text = tr(Rules.StormTrial.name) .. "\n" .. tr("Открыт и применён к спутнику")
     else
-        trial.Text = string.format("%s\nДоставь грозовое яйцо через маяк, пока на таймере %d+ сек.",
-            Rules.StormTrial.name, Rules.StormTrial.secondsLeft)
+        trial.Text = tr("%s\nДоставь грозовое яйцо через маяк, пока на таймере %d+ сек.",
+            tr(Rules.StormTrial.name), Rules.StormTrial.secondsLeft)
     end
     local count = 0
     local groupCounts = {}
@@ -818,22 +817,22 @@ update = function()
             groupCounts[row.group] = (groupCounts[row.group] or 0) + 1
         end
         row.frame.Visible = row.group.expanded
-        row.name.Text = if owned then row.pet.name .. " · " .. row.pet.rarity
-            elseif row.secret then "Неизвестный питомец" else row.pet.name
+        row.name.Text = if owned then tr(row.pet.name) .. " · " .. tr(row.pet.rarity)
+            elseif row.secret then tr("Неизвестный питомец") else tr(row.pet.name)
         local recipe = player:GetAttribute("Recipe_" .. row.id)
-        row.details.Text = if recipe then "Скрестить: " .. recipe else row.source
-        row.action.Text = if selected then "Спутник" elseif owned then "Выбрать" else "Не открыт"
+        row.details.Text = if recipe then tr("Скрестить: %s", recipe) else tr(row.source)
+        row.action.Text = if selected then tr("Спутник") elseif owned then tr("Выбрать") else tr("Не открыт")
         row.action.BackgroundColor3 = if selected then palette.mint elseif owned then palette.gold else palette.muted
         row.action.Active = owned and not selected
         row.action.Selectable = owned and not selected
         row.action.AutoButtonColor = owned and not selected
     end
     for _, group in ipairs(collectionGroups) do
-        group.button.Text = string.format("%s · %d/%d  %s", group.name, groupCounts[group] or 0,
+        group.button.Text = string.format("%s · %d/%d  %s", tr(group.name), groupCounts[group] or 0,
             #group.rows, if group.expanded then "−" else "+")
     end
-    open.Text = string.format("Питомцы %d/%d", count, #rows)
-    title.Text = string.format("Коллекция %d/%d", count, #rows)
+    open.Text = tr("Питомцы %d/%d", count, #rows)
+    title.Text = tr("Коллекция %d/%d", count, #rows)
 end
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)

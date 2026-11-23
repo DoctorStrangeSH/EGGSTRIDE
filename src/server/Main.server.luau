@@ -244,6 +244,11 @@ local function publish(player, entry, message, ...)
     end
 end
 
+local function publishRecipe(player, offspringId, parents)
+    local pair = translate(player, parents[1].name) .. " + " .. translate(player, parents[2].name)
+    player:SetAttribute("Recipe_" .. offspringId, pair)
+end
+
 local function publishSeason(player, entry)
     local progress = entry.season
     player:SetAttribute("SeasonXP", progress.xp)
@@ -472,8 +477,7 @@ local function join(player)
         player:SetAttribute("OwnsPet_" .. id, true)
     end
     for id in pairs(entry.discoveries) do
-        local parents = recipesByOffspring[id].parents
-        player:SetAttribute("Recipe_" .. id, parents[1].name .. " + " .. parents[2].name)
+        publishRecipe(player, id, recipesByOffspring[id].parents)
     end
     for id, time in pairs(record.deliveryRecords) do
         player:SetAttribute("DeliveryRecord_" .. id, time)
@@ -1064,10 +1068,9 @@ breedPet.OnServerEvent:Connect(function(player, firstId, secondId)
     if entry.discoveries[offspring.id] then
         breedPet:FireClient(player, firstId, secondId, "known", offspring.name)
     elseif Profile.breed(entry, recipe) then
-        local parents = recipe.parents
         player:SetAttribute("OwnsPet_" .. offspring.id, true)
         player:SetAttribute("Material_" .. vaultId, entry.materials[vaultId] or 0)
-        player:SetAttribute("Recipe_" .. offspring.id, parents[1].name .. " + " .. parents[2].name)
+        publishRecipe(player, offspring.id, recipe.parents)
         breedPet:FireClient(player, firstId, secondId, "found", offspring.name)
     else
         breedPet:FireClient(player, firstId, secondId, "materials")
