@@ -8,7 +8,7 @@ local Rules = require(Shared.Rules)
 local World = require(script.Parent.World)
 local Loot = require(script.Parent.Loot)
 local Season = require(script.Parent.Season)
-local TrailShop = require(script.Parent.TrailShop)
+local CosmeticShop = require(script.Parent.CosmeticShop)
 local Nursery = require(script.Parent.Nursery)
 local RoundPrize = require(script.Parent.RoundPrize)
 local Profile = require(script.Parent.Profile)
@@ -384,7 +384,11 @@ local function stopWeekly(player, entry)
     applySpeed(player, entry)
 end
 
-local trailShop = TrailShop.start(Rules.Trails, Shared, MarketplaceService, inStudio, previewSeasonPass, seasonPassId, function(player)
+local cosmetics = table.clone(Rules.Trails)
+for _, effect in ipairs(Rules.HatchEffects) do
+    table.insert(cosmetics, effect)
+end
+local cosmeticShop = CosmeticShop.start(cosmetics, Shared, MarketplaceService, inStudio, previewSeasonPass, seasonPassId, function(player)
     local entry = entries[player]
     if not closing and entry and not ProfileStore.expired(entry.session) then
         return entry
@@ -436,6 +440,7 @@ local function join(player)
         weeklyRewardWeek = record.weeklyRewardWeek,
         tier = record.tier,
         equippedTrail = record.equippedTrail,
+        equippedHatchEffect = record.equippedHatchEffect,
         pet = petCatalog[record.equipped],
         delivered = false,
         ownedPets = {},
@@ -475,7 +480,7 @@ local function join(player)
     end
     entries[player] = entry
     initPremium(player, entry)
-    trailShop.init(player, entry)
+    cosmeticShop.init(player, entry)
     pending -= 1
     advanceOnboarding(player, entry, 1)
     publish(player, entry, "")
@@ -492,7 +497,7 @@ local function join(player)
         stopWeekly(player, entry)
         clearEgg(player, entry)
         publish(player, entry)
-        trailShop.apply(player, entry)
+        cosmeticShop.apply(player, entry)
         if entry.pet then
             showPet(root, entry.pet, entry.stormTrailUnlocked)
         end

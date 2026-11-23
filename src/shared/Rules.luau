@@ -1,8 +1,14 @@
 local Rules = {}
 Rules.Trails = {
-    { id = "mint", name = "Мятный ветер", first = { 114, 255, 201 }, last = { 112, 189, 255 }, lifetime = 0.33 },
-    { id = "ember", name = "Янтарная искра", first = { 255, 222, 111 }, last = { 255, 114, 115 }, lifetime = 0.36 },
-    { id = "aurora", name = "Полярное сияние", first = { 198, 155, 255 }, last = { 109, 247, 230 }, lifetime = 0.40 },
+    { slot = "trail", id = "mint", name = "Мятный ветер", first = { 114, 255, 201 }, last = { 112, 189, 255 }, lifetime = 0.33 },
+    { slot = "trail", id = "ember", name = "Янтарная искра", first = { 255, 222, 111 }, last = { 255, 114, 115 }, lifetime = 0.36 },
+    { slot = "trail", id = "aurora", name = "Полярное сияние", first = { 198, 155, 255 }, last = { 109, 247, 230 }, lifetime = 0.40 },
+}
+
+Rules.HatchEffects = {
+    { slot = "hatch", id = "petals", name = "Танец лепестков", first = { 255, 157, 193 }, last = { 255, 229, 161 }, pattern = "petals" },
+    { slot = "hatch", id = "comet", name = "Кометный ореол", first = { 115, 212, 255 }, last = { 199, 170, 255 }, pattern = "orbit" },
+    { slot = "hatch", id = "prism", name = "Мозаика света", first = { 163, 255, 213 }, last = { 255, 213, 120 }, pattern = "prism" },
 }
 
 Rules.PrepareSeconds = 7

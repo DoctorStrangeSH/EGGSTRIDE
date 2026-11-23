@@ -149,6 +149,12 @@ function Profile.read(stored, catalog, rules)
             break
         end
     end
+    for _, effect in ipairs(rules.HatchEffects) do
+        if stored.equippedHatchEffect == effect.id then
+            record.equippedHatchEffect = effect.id
+            break
+        end
+    end
     record.tier = stored.tier
     record.season = readSeason(stored.season, rules)
     record.deliveries = readCounts(stored.deliveries, rules.Vaults)
@@ -222,6 +228,7 @@ function Profile.snapshot(entry)
     local record = Profile.new(entry.coins)
     record.tier = entry.tier
     record.equippedTrail = entry.equippedTrail
+    record.equippedHatchEffect = entry.equippedHatchEffect
     record.muteRunSounds = entry.muteRunSounds == true
     record.reduceCardMotion = entry.reduceCardMotion == true
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true

@@ -1,6 +1,8 @@
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
+local HatchEffects = require(script.Parent.HatchEffects)
+
 local RunFeedback = {}
 
 local function sound(name, file, speed, volume)
@@ -74,6 +76,14 @@ function RunFeedback.connect(gui, event, rules, player)
     local detail = addLabel(card, 1, 13)
     detail.TextColor3 = Color3.fromRGB(255, 251, 231)
 
+    local effectLane = Instance.new("Frame")
+    effectLane.Name = "HatchEffect"
+    effectLane.LayoutOrder = -1
+    effectLane.Size = UDim2.new(1, 0, 0, 40)
+    effectLane.BackgroundTransparency = 1
+    effectLane.Visible = false
+    effectLane.Parent = card
+
     local lastResult = 0
     local animation
     local function stopAnimation()
@@ -87,10 +97,11 @@ function RunFeedback.connect(gui, event, rules, player)
     player:GetAttributeChangedSignal("ReduceCardMotion"):Connect(function()
         if player:GetAttribute("ReduceCardMotion") then
             stopAnimation()
+            HatchEffects.clear(effectLane)
         end
     end)
 
-    local function show(heading, description, accent)
+    local function show(heading, description, accent, effect)
         lastResult += 1
         local thisResult = lastResult
         stopAnimation()
@@ -98,7 +109,12 @@ function RunFeedback.connect(gui, event, rules, player)
         title.TextColor3 = accent
         detail.Text = description
         outline.Color = accent
+        HatchEffects.clear(effectLane)
+        effectLane.Visible = effect ~= nil
         card.Visible = true
+        if effect then
+            HatchEffects.play(effectLane, effect, player:GetAttribute("ReduceCardMotion") == true)
+        end
         if player:GetAttribute("ReduceCardMotion") ~= true then
             scale.Scale = 0.94
             animation = TweenService:Create(scale, TweenInfo.new(0.16, Enum.EasingStyle.Quad), { Scale = 1 })
@@ -139,7 +155,16 @@ function RunFeedback.connect(gui, event, rules, player)
             if recordXP then
                 collection ..= "\nЗадание сезона: рекорд · +" .. recordXP .. " XP"
             end
-            show(if isNew then petName .. " · новый вид" else petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
+            local equipped = player:GetAttribute("EquippedHatchEffect")
+            local effect
+            for _, item in ipairs(rules.HatchEffects) do
+                if item.id == equipped then
+                    effect = item
+                    break
+                end
+            end
+            show(if isNew then petName .. " · новый вид" else petName,
+                string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent, effect)
             hatchSound.PlaybackSpeed = if rarity ~= "Обычный" then 1.28 else 1.10
             play(hatchSound)
         elseif kind == "WeeklyFinish" then

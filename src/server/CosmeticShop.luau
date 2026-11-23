@@ -1,17 +1,21 @@
-local TrailShop = {}
+local CosmeticShop = {}
 
-function TrailShop.select(entry, id, owned)
-    if id ~= "" and not owned then
+local fields = { trail = "equippedTrail", hatch = "equippedHatchEffect" }
+local attributes = { trail = "EquippedTrail", hatch = "EquippedHatchEffect" }
+local passPrefixes = { trail = "TrailPass_", hatch = "HatchPass_" }
+
+function CosmeticShop.select(entry, item, owned, clear)
+    if not clear and not owned then
         return false
     end
-    entry.equippedTrail = if id == "" then nil else id
+    entry[fields[item.slot]] = if clear then nil else item.id
     return true
 end
 
-function TrailShop.passes(catalog, getAttribute, reservedId)
+function CosmeticShop.passes(catalog, getAttribute, reservedId)
     local ids, counts = {}, {}
     for _, item in ipairs(catalog) do
-        local passId = getAttribute("TrailPass_" .. item.id)
+        local passId = getAttribute(passPrefixes[item.slot] .. item.id)
         if type(passId) == "number" and passId > 0 and passId <= 9e15 and passId % 1 == 0
             and passId ~= reservedId then
             ids[item.id] = passId
@@ -26,11 +30,11 @@ function TrailShop.passes(catalog, getAttribute, reservedId)
     return ids
 end
 
-function TrailShop.start(catalog, shared, marketplace, studio, preview, reservedId, findEntry)
+function CosmeticShop.start(catalog, shared, marketplace, studio, preview, reservedId, findEntry)
     local remote = Instance.new("RemoteEvent")
-    remote.Name = "TrailShop"
+    remote.Name = "CosmeticShop"
 
-    local ids = TrailShop.passes(catalog, function(name)
+    local ids = CosmeticShop.passes(catalog, function(name)
         return workspace:GetAttribute(name)
     end, reservedId)
     local items, byPass = {}, {}
@@ -56,7 +60,7 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
             end
         end
         local selection = entry.equippedTrail
-        local wearing = selection and entry.trailStatuses[selection] == "owned"
+        local wearing = selection and entry.cosmeticStatuses[selection] == "owned"
         local id = entry.trailPreview or (wearing and selection)
         local item = id and items[id]
         if not item then
@@ -84,11 +88,21 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
         trail.Parent = root
     end
 
-    local function setStatus(player, entry, id, status)
-        entry.trailStatuses[id] = status
-        player:SetAttribute("TrailStatus_" .. id, status)
-        if entry.equippedTrail == id then
+    local function publishSelection(player, entry, slot)
+        local id = entry[fields[slot]]
+        local owned = id and entry.cosmeticStatuses[id] == "owned"
+        player:SetAttribute(attributes[slot], if owned then id else "")
+        if slot == "trail" then
             apply(player, entry)
+        end
+    end
+
+    local function setStatus(player, entry, id, status)
+        entry.cosmeticStatuses[id] = status
+        player:SetAttribute("CosmeticStatus_" .. id, status)
+        local slot = items[id].slot
+        if entry[fields[slot]] == id then
+            publishSelection(player, entry, slot)
         end
     end
 
@@ -98,15 +112,18 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
         end
         setStatus(player, entry, id, "checking")
         local ok, owned = pcall(marketplace.UserOwnsGamePassAsync, marketplace, player.UserId, ids[id])
-        if findEntry(player) == entry and entry.trailStatuses[id] == "checking" then
+        if findEntry(player) == entry and entry.cosmeticStatuses[id] == "checking" then
             setStatus(player, entry, id, if not ok then "error" elseif owned then "owned" else "locked")
         end
     end
 
     local function init(player, entry)
-        entry.trailStatuses = {}
-        entry.nextTrailActionAt = 0
-        player:SetAttribute("EquippedTrail", entry.equippedTrail or "")
+        entry.cosmeticStatuses = {}
+        entry.nextCosmeticActionAt = 0
+        entry.nextCosmeticPurchaseAt = 0
+        for slot in pairs(attributes) do
+            publishSelection(player, entry, slot)
+        end
         for _, item in ipairs(catalog) do
             if preview then
                 setStatus(player, entry, item.id, "preview")
@@ -120,21 +137,36 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
 
     remote.OnServerEvent:Connect(function(player, action, id)
         local entry = findEntry(player)
-        if not entry or not entry.trailStatuses or type(id) ~= "string" or #id > 32
-            or (id ~= "" and not items[id]) then
+        if not entry or not entry.cosmeticStatuses or type(id) ~= "string" or #id > 32
+            or not items[id] or (action ~= "equip" and action ~= "unequip" and action ~= "try" and action ~= "buy") then
             return
         end
         local now = os.clock()
-        if now < entry.nextTrailActionAt then
-            return
+        if action == "buy" then
+            if now < entry.nextCosmeticPurchaseAt then
+                return
+            end
+            entry.nextCosmeticPurchaseAt = now + 2
+        else
+            if now < entry.nextCosmeticActionAt then
+                return
+            end
+            entry.nextCosmeticActionAt = now + 0.25
         end
-        entry.nextTrailActionAt = now + (if action == "buy" then 2 else 0.25)
-        local status = entry.trailStatuses[id]
-        if action == "equip" and TrailShop.select(entry, id, status == "owned") then
-            entry.trailPreview = nil
-            player:SetAttribute("EquippedTrail", entry.equippedTrail or "")
-            apply(player, entry)
-        elseif action == "try" and id ~= "" and not entry.weekly then
+        local status = entry.cosmeticStatuses[id]
+        local item = items[id]
+        if action == "equip" or action == "unequip" then
+            local clear = action == "unequip"
+            if clear and entry[fields[item.slot]] ~= id then
+                return
+            end
+            if CosmeticShop.select(entry, item, status == "owned", clear) then
+                if item.slot == "trail" then
+                    entry.trailPreview = nil
+                end
+                publishSelection(player, entry, item.slot)
+            end
+        elseif action == "try" and item.slot == "trail" and not entry.weekly then
             local token = {}
             entry.trailPreview = id
             entry.trailPreviewToken = token
@@ -150,12 +182,12 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
         elseif action == "buy" and not studio and ids[id] then
             if status == "error" then
                 check(player, entry, id)
-            elseif status == "locked" and not entry.trailPrompt then
-                entry.trailPrompt = id
+            elseif status == "locked" and not entry.cosmeticPrompt then
+                entry.cosmeticPrompt = id
                 setStatus(player, entry, id, "prompting")
                 local ok = pcall(marketplace.PromptGamePassPurchase, marketplace, player, ids[id])
-                if not ok and findEntry(player) == entry and entry.trailPrompt == id then
-                    entry.trailPrompt = nil
+                if not ok and findEntry(player) == entry and entry.cosmeticPrompt == id then
+                    entry.cosmeticPrompt = nil
                     setStatus(player, entry, id, "error")
                 end
             end
@@ -166,15 +198,15 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
         marketplace.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
             local id = byPass[passId]
             local entry = findEntry(player)
-            if not id or not entry or not entry.trailStatuses then
+            if not id or not entry or not entry.cosmeticStatuses then
                 return
             end
-            if entry.trailPrompt == id then
-                entry.trailPrompt = nil
+            if entry.cosmeticPrompt == id then
+                entry.cosmeticPrompt = nil
             end
             if purchased then
                 setStatus(player, entry, id, "owned")
-            elseif entry.trailStatuses[id] == "prompting" then
+            elseif entry.cosmeticStatuses[id] == "prompting" then
                 setStatus(player, entry, id, "locked")
             end
         end)
@@ -184,4 +216,4 @@ function TrailShop.start(catalog, shared, marketplace, studio, preview, reserved
     return { init = init, apply = apply }
 end
 
-return TrailShop
+return CosmeticShop
