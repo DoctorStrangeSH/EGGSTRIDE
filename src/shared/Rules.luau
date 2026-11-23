@@ -331,6 +331,21 @@ function Rules.windFactor(direction, speedX, protected)
     return if protected then 1 else Rules.WindHeadwind
 end
 
+function Rules.onboardingObjective(step, roundOpen, delivered, tier)
+    if step == 1 or step == 2 then
+        if roundOpen then
+            return "firstEgg"
+        end
+        return if tier == 1 then "train" else "gate"
+    elseif step == 3 then
+        if delivered then
+            return "collection"
+        end
+        return if roundOpen then "nextEgg" else "gate"
+    end
+    return nil
+end
+
 function Rules.onboardingAfterPickup(step)
     if step == 1 then
         return 2

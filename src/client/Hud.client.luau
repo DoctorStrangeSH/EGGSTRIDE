@@ -201,8 +201,20 @@ local function updateGuide()
     waypoint.Enabled = nearby and waypoint.Adornee ~= nil
 end
 
+local onboardingTargets = {
+    firstEgg = eggTarget, nextEgg = eggTarget, train = trainingTarget, gate = gateTarget,
+}
+local onboardingLabels = {
+    firstEgg = text("Забери яйцо на Луговом острове"),
+    nextEgg = text("Возьми ещё одно луговое яйцо"),
+    train = text("Купи скорость за %d монет", Rules.UpgradeCosts[1]),
+    gate = text("Дождись старта у ворот"),
+    collection = text("Открой коллекцию до следующего забега"),
+}
+
 local function update()
     local carrying = player:GetAttribute("CarryingEgg") == true
+    local delivered = player:GetAttribute("Delivered") == true
     local abilityId = player:GetAttribute("EggAbility")
     local ability = Rules.Abilities[abilityId]
     local tier = player:GetAttribute("SpeedTier") or 1
@@ -212,26 +224,19 @@ local function update()
         else round:GetAttribute("PrizeStatus_meadow_" .. locale.language) or text("Луговое яйцо доступно каждому")
     objective.Text = if carrying and ability then text(ability.hint)
         elseif carrying then text("К инкубатору")
-        elseif player:GetAttribute("Delivered") then text("Яйцо спасено")
+        elseif delivered then text("Яйцо спасено")
         else prizeStatus or ""
-    local step = player:GetAttribute("OnboardingStep")
     local target
     if carrying then
         local shortcut = abilityTargets[abilityId]
         target = if shortcut then shortcut.Value else hatchTarget.Value
-    elseif (step == 1 or step == 2) and not player:GetAttribute("Delivered") then
-        if runOpen then
-            objective.Text = text("Забери яйцо на Луговом острове")
-            target = eggTarget.Value
-        elseif tier == 1 then
-            objective.Text = text("Купи скорость за %d монет", Rules.UpgradeCosts[1])
-            target = trainingTarget.Value
-        else
-            objective.Text = text("Дождись старта у ворот")
-            target = gateTarget.Value
+    else
+        local objectiveKey = Rules.onboardingObjective(player:GetAttribute("OnboardingStep"), runOpen, delivered, tier)
+        if objectiveKey then
+            objective.Text = onboardingLabels[objectiveKey]
+            local marker = onboardingTargets[objectiveKey]
+            target = marker and marker.Value
         end
-    elseif step == 3 and not carrying then
-        objective.Text = text("Открой коллекцию питомцев")
     end
     local weeklyStart = player:GetAttribute("WeeklyStartsAt")
     if exitAttempt and exitAttempt ~= weeklyStart then
