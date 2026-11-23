@@ -13,14 +13,16 @@ local function sound(name, file, speed, volume)
     return player
 end
 
-local function addLabel(parent, textSize, y, height)
+local function addLabel(parent, order, textSize)
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.GothamBold
     label.TextSize = textSize
     label.TextWrapped = true
-    label.Position = UDim2.fromOffset(12, y)
-    label.Size = UDim2.new(1, -24, 0, height)
+    label.LayoutOrder = order
+    label.Size = UDim2.new(1, 0, 0, 0)
+    label.AutomaticSize = Enum.AutomaticSize.Y
+    label.Text = ""
     label.Parent = parent
     return label
 end
@@ -49,18 +51,27 @@ function RunFeedback.connect(gui, event, rules, player)
     card.Name = "RunResult"
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.72)
-    card.Size = UDim2.new(0.88, 0, 0, 76)
+    card.Size = UDim2.new(1, -24, 0, 0)
+    card.AutomaticSize = Enum.AutomaticSize.Y
     card.BackgroundColor3 = Color3.fromRGB(37, 34, 65)
     card.Visible = false
     card.Parent = gui
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
-    Instance.new("UISizeConstraint", card).MaxSize = Vector2.new(380, 76)
+    Instance.new("UISizeConstraint", card).MaxSize = Vector2.new(336, math.huge)
+    local padding = Instance.new("UIPadding", card)
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.PaddingTop = UDim.new(0, 8)
+    padding.PaddingBottom = UDim.new(0, 8)
+    local layout = Instance.new("UIListLayout", card)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 4)
 
     local outline = Instance.new("UIStroke", card)
     outline.Thickness = 2
     local scale = Instance.new("UIScale", card)
-    local title = addLabel(card, 18, 6, 30)
-    local detail = addLabel(card, 13, 35, 34)
+    local title = addLabel(card, 0, 16)
+    local detail = addLabel(card, 1, 13)
     detail.TextColor3 = Color3.fromRGB(255, 251, 231)
 
     local lastResult = 0

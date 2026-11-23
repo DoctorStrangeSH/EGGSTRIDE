@@ -135,6 +135,7 @@ local function publish(player, entry, message)
     player:SetAttribute("EggAbility", entry.egg and not entry.abilityUsed and entry.egg.ability or "")
     player:SetAttribute("Delivered", entry.delivered)
     if message then
+        player:SetAttribute("NoticeUntil", workspace:GetServerTimeNow() + 5)
         player:SetAttribute("Notice", message)
     end
 end
@@ -291,7 +292,7 @@ local function join(player)
     entries[player] = entry
     pending -= 1
     advanceOnboarding(player, entry, 1)
-    publish(player, entry, "Заработай скорость в лагере или сразу попробуй ближайший остров.")
+    publish(player, entry, "")
 
     local function spawn(character)
         local humanoid = character:WaitForChild("Humanoid", 10)
@@ -314,7 +315,7 @@ local function join(player)
             end
             if entry.weekly then
                 stopWeekly(player, entry)
-                publish(player, entry, "Забег недели прерван. Попробуй ещё раз из лагеря.")
+                publish(player, entry, "")
                 runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")
             end
             local lost = entry.egg ~= nil
@@ -322,7 +323,7 @@ local function join(player)
             if lost then
                 runFeedback:FireClient(player, "Fall")
             end
-            publish(player, entry, if lost then "Яйцо потеряно. Следующий забег начнётся в лагере." else nil)
+            publish(player, entry, if lost then "" else nil)
         end)
     end
 
@@ -415,7 +416,7 @@ cancelWeekly.OnServerEvent:Connect(function(player, startsAt)
     end
 
     returnFromWeekly(player, entry, root)
-    publish(player, entry, "Попытка отменена. Новый забег можно начать из лагеря.")
+    publish(player, entry, "")
     runFeedback:FireClient(player, "WeeklyCancelled")
 end)
 
@@ -423,7 +424,7 @@ local function finishWeekly(player, entry, root, now, week, completed)
     local attempt = entry.weekly
     returnFromWeekly(player, entry, root)
     if not completed then
-        publish(player, entry, "Забег недели прерван. Попробуй снова из лагеря.")
+        publish(player, entry, "")
         runFeedback:FireClient(player, "WeeklyStopped", "Попробуй ещё раз из лагеря.")
         return
     end
@@ -446,14 +447,12 @@ local function finishWeekly(player, entry, root, now, week, completed)
     if rankedBest then
         task.defer(weeklyLeaderboard.submit, weeklyLeaderboard, player.UserId, player.Name, week, rankedBest)
     end
-    local message = if best then "Личный рекорд недели · " else "Забег завершён · "
-    local qualification = if attempt.rankable then "" else " · вне рейтинга"
     local milliseconds = math.round(elapsed * 1000)
     local rewardCoins = Rules.claimWeeklyReward(entry, week, milliseconds, attempt.rankable)
     if rewardCoins then
         player:SetAttribute("WeeklyRewardClaimed", true)
     end
-    publish(player, entry, message .. Rules.deliveryTimeText(milliseconds) .. qualification)
+    publish(player, entry, "")
     local result = if not attempt.rankable then "Вне рейтинга"
         elseif rankedBest then "Допущен к рейтингу"
         else "В рейтинге остаётся лучшее время"
@@ -485,7 +484,7 @@ local function syncRound()
             if lost then
                 runFeedback:FireClient(player, "Timeout")
             end
-            publish(player, entry, if lost then "Время вышло. Вынеси яйцо в следующем забеге." else nil)
+            publish(player, entry, if lost then "" else nil)
         end
     end
     if open ~= wasOpen then
@@ -600,7 +599,7 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     root.Anchored = true
     applySpeed(player, entry)
     player:SetAttribute("WeeklyStartsAt", attempt.startsAt)
-    publish(player, entry, "Пройди метки, возьми яйцо и вернись на финиш.")
+    publish(player, entry, "")
 end)
 
 for index, display in ipairs(map.vaults) do
@@ -752,8 +751,7 @@ withNearbyPlayer(map.hatch, function(player, entry, root)
         showPet(root, entry.pet, entry.stormTrailUnlocked)
     end
     advanceOnboarding(player, entry, 3)
-    local result = if isNew then "Новый в журнале: " else "Вылупился "
-    publish(player, entry, result .. pet.name .. " · " .. pet.rarity .. " · +" .. vault.coins .. " монет.")
+    publish(player, entry, "")
     runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins, isNew,
         if unlockedTrail then Rules.StormTrial.name else nil, personalBest)
 end)

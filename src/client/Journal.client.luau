@@ -37,46 +37,68 @@ gui.Name = "EggstrideJournal"
 gui.DisplayOrder = 2
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
-gui.Parent = player:WaitForChild("PlayerGui")
+local playerGui = player:WaitForChild("PlayerGui")
+gui.Parent = playerGui
 
-local open = textItem("TextButton", gui, "Питомцы", 14, palette.panel)
-open.AnchorPoint = Vector2.new(0.5, 0)
-open.Position = UDim2.new(0.5, 0, 0, 146)
-open.Size = UDim2.fromOffset(150, 44)
-fill(open, palette.gold, 12)
+local header = playerGui:WaitForChild("EggstrideHud"):WaitForChild("Status"):WaitForChild("Header")
+local open = textItem("TextButton", header, "Питомцы", 13, palette.panel)
+open.AnchorPoint = Vector2.new(1, 0)
+open.Position = UDim2.fromScale(1, 0)
+open.Size = UDim2.fromOffset(102, 44)
+fill(open, palette.gold, 9)
+
+local scrim = Instance.new("Frame")
+scrim.Name = "Collection"
+scrim.Size = UDim2.fromScale(1, 1)
+scrim.BackgroundColor3 = Color3.new(0, 0, 0)
+scrim.BackgroundTransparency = 0.42
+scrim.Active = true
+scrim.Visible = false
+scrim.Parent = gui
 
 local panel = Instance.new("Frame")
-panel.AnchorPoint = Vector2.new(0.5, 0)
-panel.Position = UDim2.new(0.5, 0, 0, 146)
-panel.Size = UDim2.new(0.92, 0, 1, -156)
-panel.Visible = false
-panel.Parent = gui
-fill(panel, palette.panel, 16)
-Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(468, 480)
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Position = UDim2.fromScale(0.5, 0.5)
+panel.Size = UDim2.new(1, -16, 1, -16)
+panel.Parent = scrim
+fill(panel, palette.panel, 12)
+Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(440, 500)
 
-local title = textItem("TextLabel", panel, "Коллекция", 20, palette.text)
-title.Position = UDim2.fromOffset(16, 5)
-title.Size = UDim2.new(1, -130, 0, 46)
+local title = textItem("TextLabel", panel, "Коллекция", 17, palette.text)
+title.Position = UDim2.fromOffset(12, 4)
+title.Size = UDim2.new(1, -108, 0, 44)
 title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextWrapped = true
 
-local close = textItem("TextButton", panel, "Закрыть", 14, palette.text)
+local close = textItem("TextButton", panel, "Закрыть", 13, palette.text)
 close.AnchorPoint = Vector2.new(1, 0)
-close.Position = UDim2.new(1, -10, 0, 6)
-close.Size = UDim2.fromOffset(90, 44)
-fill(close, palette.row, 10)
+close.Position = UDim2.new(1, -8, 0, 4)
+close.Size = UDim2.fromOffset(80, 44)
+fill(close, palette.row, 9)
+
+local function updateLauncher()
+    local racing = player:GetAttribute("WeeklyStartsAt") ~= nil
+    if racing then
+        scrim.Visible = false
+    end
+    open.Visible = not (racing or scrim.Visible)
+end
+
 open.Activated:Connect(function()
-    panel.Visible = true
-    open.Visible = false
+    scrim.Visible = true
+    updateLauncher()
 end)
 close.Activated:Connect(function()
-    panel.Visible = false
-    open.Visible = true
+    scrim.Visible = false
+    updateLauncher()
 end)
+player:GetAttributeChangedSignal("WeeklyStartsAt"):Connect(updateLauncher)
+updateLauncher()
 
 local list = Instance.new("ScrollingFrame")
 list.Name = "Species"
-list.Position = UDim2.fromOffset(12, 58)
-list.Size = UDim2.new(1, -24, 1, -70)
+list.Position = UDim2.fromOffset(8, 54)
+list.Size = UDim2.new(1, -16, 1, -62)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.CanvasSize = UDim2.new()
@@ -129,22 +151,24 @@ settings.Activated:Connect(function()
     end
 end)
 
-local trial = textItem("TextLabel", list, "", 13, palette.gold)
-trial.Name = "StormTrial"
-trial.LayoutOrder = 0
-trial.Size = UDim2.new(1, -8, 0, 62)
-trial.TextWrapped = true
-fill(trial, palette.row, 10)
-local trialPadding = Instance.new("UIPadding", trial)
-trialPadding.PaddingLeft = UDim.new(0, 10)
-trialPadding.PaddingRight = UDim.new(0, 10)
+local function description(name, order, color)
+    local label = textItem("TextLabel", list, "", 13, color)
+    label.Name = name
+    label.LayoutOrder = order
+    label.Size = UDim2.new(1, -8, 0, 0)
+    label.AutomaticSize = Enum.AutomaticSize.Y
+    label.TextWrapped = true
+    fill(label, palette.row, 9)
+    local padding = Instance.new("UIPadding", label)
+    padding.PaddingLeft = UDim.new(0, 8)
+    padding.PaddingRight = UDim.new(0, 8)
+    padding.PaddingTop = UDim.new(0, 8)
+    padding.PaddingBottom = UDim.new(0, 8)
+    return label
+end
 
-local weekly = textItem("TextLabel", list, "", 13, palette.text)
-weekly.Name = "WeeklyBest"
-weekly.LayoutOrder = 1
-weekly.Size = UDim2.new(1, -8, 0, 62)
-weekly.TextWrapped = true
-fill(weekly, palette.row, 10)
+local trial = description("StormTrial", 0, palette.gold)
+local weekly = description("WeeklyBest", 1, palette.text)
 
 local round = shared:WaitForChild("Round")
 local leaderboardFeed = round:WaitForChild("WeeklyLeaderboard")
@@ -152,17 +176,8 @@ local boardButton = textItem("TextButton", list, "Показать топ нед
 boardButton.LayoutOrder = 2
 boardButton.Size = UDim2.new(1, -8, 0, 44)
 fill(boardButton, palette.gold, 10)
-local board = textItem("TextLabel", list, "", 13, palette.text)
-board.Name = "WeeklyLeaderboard"
-board.LayoutOrder = 3
+local board = description("WeeklyLeaderboard", 3, palette.text)
 board.Visible = false
-board.Size = UDim2.new(1, -8, 0, 0)
-board.AutomaticSize = Enum.AutomaticSize.Y
-board.TextWrapped = true
-fill(board, palette.row, 10)
-local boardPadding = Instance.new("UIPadding", board)
-boardPadding.PaddingTop = UDim.new(0, 10)
-boardPadding.PaddingBottom = UDim.new(0, 10)
 
 boardButton.Activated:Connect(function()
     board.Visible = not board.Visible
@@ -184,24 +199,36 @@ local order = 3
 
 for _, vault in ipairs(Rules.Vaults) do
     order += 1
-    local record = textItem("TextLabel", list, "", 13, palette.gold)
-    record.Name = "DeliveryRecord_" .. vault.id
-    record.LayoutOrder = order
-    record.Size = UDim2.new(1, -8, 0, 32)
-    record.TextWrapped = true
+    local record = description("DeliveryRecord_" .. vault.id, order, palette.gold)
+    record.BackgroundTransparency = 1
     recordLabels[vault] = record
     for _, pet in ipairs({ vault.pets.common, vault.pets.rare }) do
         local row = Instance.new("Frame")
         row.Name = pet.id
         order += 1
         row.LayoutOrder = order
-        row.Size = UDim2.new(1, -8, 0, 78)
+        row.Size = UDim2.new(1, -8, 0, 0)
+        row.AutomaticSize = Enum.AutomaticSize.Y
         row.Parent = list
         fill(row, palette.row, 10)
 
-        local name = textItem("TextLabel", row, pet.name, 15, palette.text)
-        name.Position = UDim2.fromOffset(10, 7)
-        name.Size = UDim2.new(1, -112, 0, 21)
+        local copy = Instance.new("Frame")
+        copy.BackgroundTransparency = 1
+        copy.Size = UDim2.new(1, -104, 0, 0)
+        copy.AutomaticSize = Enum.AutomaticSize.Y
+        copy.Parent = row
+        local copyPadding = Instance.new("UIPadding", copy)
+        copyPadding.PaddingLeft = UDim.new(0, 10)
+        copyPadding.PaddingTop = UDim.new(0, 8)
+        copyPadding.PaddingBottom = UDim.new(0, 8)
+        local copyLayout = Instance.new("UIListLayout", copy)
+        copyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        copyLayout.Padding = UDim.new(0, 2)
+
+        local name = textItem("TextLabel", copy, pet.name, 14, palette.text)
+        name.Size = UDim2.new(1, 0, 0, 0)
+        name.AutomaticSize = Enum.AutomaticSize.Y
+        name.TextWrapped = true
         name.TextXAlignment = Enum.TextXAlignment.Left
 
         local commonEggOdds = Rules.RarePetChance["Обычное"]
@@ -211,15 +238,16 @@ for _, vault in ipairs(Rules.Vaults) do
         end
         local condition = string.format("%s\nИз обычного яйца %d%%, редкого %d%%",
             pet.rarity, commonEggOdds, rareEggOdds)
-        local details = textItem("TextLabel", row, condition, 12, palette.muted)
-        details.Position = UDim2.fromOffset(10, 29)
-        details.Size = UDim2.new(1, -112, 0, 42)
+        local details = textItem("TextLabel", copy, condition, 12, palette.muted)
+        details.LayoutOrder = 1
+        details.Size = UDim2.new(1, 0, 0, 0)
+        details.AutomaticSize = Enum.AutomaticSize.Y
         details.TextXAlignment = Enum.TextXAlignment.Left
         details.TextWrapped = true
 
         local action = textItem("TextButton", row, "", 12, palette.panel)
-        action.AnchorPoint = Vector2.new(1, 0.5)
-        action.Position = UDim2.new(1, -8, 0.5, 0)
+        action.AnchorPoint = Vector2.new(1, 0)
+        action.Position = UDim2.new(1, -8, 0, 8)
         action.Size = UDim2.fromOffset(86, 44)
         fill(action, palette.muted, 9)
         action.Activated:Connect(function()

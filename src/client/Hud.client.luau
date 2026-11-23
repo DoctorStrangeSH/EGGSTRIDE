@@ -18,6 +18,7 @@ end
 
 local colors = {
     ink = Color3.fromRGB(37, 34, 65),
+    button = Color3.fromRGB(55, 51, 86),
     white = Color3.fromRGB(255, 251, 231),
     gold = Color3.fromRGB(255, 209, 117),
     mint = Color3.fromRGB(163, 255, 201),
@@ -27,44 +28,66 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "EggstrideHud"
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
-gui.Parent = player:WaitForChild("PlayerGui")
-local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"), Rules, player)
 
 local panel = Instance.new("Frame")
+panel.Name = "Status"
 panel.AnchorPoint = Vector2.new(0.5, 0)
-panel.Position = UDim2.new(0.5, 0, 0, 9)
-panel.Size = UDim2.new(0.94, 0, 0, 130)
+panel.Position = UDim2.new(0.5, 0, 0, 6)
+panel.Size = UDim2.new(1, -16, 0, 0)
+panel.AutomaticSize = Enum.AutomaticSize.Y
 panel.BackgroundColor3 = colors.ink
-panel.BackgroundTransparency = 0.06
+panel.BackgroundTransparency = 0.12
 panel.Parent = gui
-Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
-Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(420, 130)
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 12)
+Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(364, math.huge)
 
-local function label(name, y, height, size, color)
+local padding = Instance.new("UIPadding", panel)
+padding.PaddingLeft = UDim.new(0, 8)
+padding.PaddingRight = UDim.new(0, 8)
+padding.PaddingTop = UDim.new(0, 4)
+padding.PaddingBottom = UDim.new(0, 6)
+local stack = Instance.new("UIListLayout", panel)
+stack.SortOrder = Enum.SortOrder.LayoutOrder
+stack.Padding = UDim.new(0, 2)
+
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Size = UDim2.new(1, 0, 0, 44)
+header.BackgroundTransparency = 1
+header.Parent = panel
+
+local function label(parent, name, order, size, color)
     local item = Instance.new("TextLabel")
     item.Name = name
-    item.Position = UDim2.new(0, 12, 0, y)
-    item.Size = UDim2.new(1, -24, 0, height)
+    item.LayoutOrder = order
+    item.Size = UDim2.new(1, 0, 0, 0)
+    item.AutomaticSize = Enum.AutomaticSize.Y
     item.BackgroundTransparency = 1
-    item.Font = Enum.Font.GothamBold
+    item.Font = Enum.Font.GothamMedium
     item.Text = ""
     item.TextSize = size
     item.TextColor3 = color
     item.TextWrapped = true
-    item.Parent = panel
+    item.TextXAlignment = Enum.TextXAlignment.Left
+    item.Parent = parent
     return item
 end
 
-local timer = label("Timer", 5, 26, 17, colors.gold)
-local stats = label("Stats", 30, 22, 15, colors.white)
-local pet = label("Pet", 53, 19, 13, colors.mint)
-local objective = label("Objective", 74, 22, 13, colors.gold)
-local notice = label("Notice", 94, 32, 12, colors.white)
+local timer = label(header, "Timer", 0, 15, colors.gold)
+timer.Size = UDim2.new(1, -110, 1, 0)
+timer.AutomaticSize = Enum.AutomaticSize.None
+timer.Font = Enum.Font.GothamBold
+local stats = label(panel, "Stats", 1, 13, colors.white)
+local objective = label(panel, "Objective", 2, 13, colors.mint)
+local notice = label(panel, "Notice", 3, 12, colors.white)
+
+gui.Parent = player:WaitForChild("PlayerGui")
+local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"), Rules, player)
 
 local runOpen = false
 local guide = Instance.new("Highlight")
 guide.Name = "EggstrideObjective"
-guide.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+guide.DepthMode = Enum.HighlightDepthMode.Occluded
 guide.FillColor = colors.gold
 guide.FillTransparency = 0.82
 guide.OutlineColor = colors.gold
@@ -73,9 +96,11 @@ guide.Parent = workspace
 
 local waypoint = Instance.new("BillboardGui")
 waypoint.Name = "WeeklyWaypoint"
-waypoint.AlwaysOnTop = true
-waypoint.Size = UDim2.fromOffset(92, 34)
-waypoint.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+waypoint.AlwaysOnTop = false
+waypoint.MaxDistance = 56
+waypoint.LightInfluence = 0
+waypoint.Size = UDim2.fromOffset(24, 20)
+waypoint.StudsOffsetWorldSpace = Vector3.new(0, 2, 0)
 waypoint.Enabled = false
 waypoint.Parent = gui
 
@@ -84,46 +109,50 @@ waypointText.Size = UDim2.fromScale(1, 1)
 waypointText.BackgroundColor3 = colors.gold
 waypointText.TextColor3 = colors.ink
 waypointText.Font = Enum.Font.GothamBold
-waypointText.TextSize = 15
+waypointText.TextSize = 12
+waypointText.Text = "▼"
 waypointText.Parent = waypoint
-Instance.new("UICorner", waypointText).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", waypointText).CornerRadius = UDim.new(0, 6)
 
 local exitControls = Instance.new("Frame")
 exitControls.Name = "WeeklyExit"
-exitControls.AnchorPoint = Vector2.new(0.5, 0)
-exitControls.Position = UDim2.new(0.5, 0, 0, 196)
-exitControls.Size = UDim2.fromOffset(244, 44)
+exitControls.LayoutOrder = 4
+exitControls.Size = UDim2.new(1, 0, 0, 44)
 exitControls.BackgroundTransparency = 1
 exitControls.Visible = false
-exitControls.Parent = gui
+exitControls.Parent = panel
 
-local function exitButton(name, caption, x, width, background, foreground)
+local function exitButton(parent, name, caption, position, size, background, foreground)
     local button = Instance.new("TextButton")
     button.Name = name
     button.Text = caption
-    button.Position = UDim2.fromOffset(x, 0)
-    button.Size = UDim2.fromOffset(width, 44)
+    button.Position = position
+    button.Size = size
+    button.TextWrapped = true
     button.Font = Enum.Font.GothamBold
     button.TextSize = 13
     button.BackgroundColor3 = background
     button.TextColor3 = foreground
-    button.Parent = exitControls
+    button.Parent = parent
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
     return button
 end
 
-local exit = exitButton("Exit", "Выйти из забега", 44, 156, colors.ink, colors.white)
-local confirm = exitButton("ConfirmExit", "Выйти в лагерь", 0, 118, colors.gold, colors.ink)
-local resume = exitButton("ResumeRun", "Продолжить", 126, 118, colors.ink, colors.white)
+local exit = exitButton(header, "Exit", "Выйти", UDim2.fromScale(1, 0),
+    UDim2.fromOffset(102, 44), colors.button, colors.white)
+exit.AnchorPoint = Vector2.new(1, 0)
+exit.Visible = false
+local confirm = exitButton(exitControls, "ConfirmExit", "Выйти в лагерь", UDim2.new(),
+    UDim2.new(0.5, -3, 1, 0), colors.gold, colors.ink)
+local resume = exitButton(exitControls, "ResumeRun", "Продолжить", UDim2.new(0.5, 3, 0, 0),
+    UDim2.new(0.5, -3, 1, 0), colors.button, colors.white)
 local exitAttempt
 
 local function showExitConfirmation(shown)
-    exit.Visible = not shown
-    confirm.Visible = shown
-    resume.Visible = shown
+    exit.Visible = not shown and player:GetAttribute("WeeklyStartsAt") ~= nil
+    exitControls.Visible = shown
 end
 
-showExitConfirmation(false)
 exit.Activated:Connect(function()
     exitAttempt = player:GetAttribute("WeeklyStartsAt")
     showExitConfirmation(exitAttempt ~= nil)
@@ -140,69 +169,83 @@ confirm.Activated:Connect(function()
     showExitConfirmation(false)
 end)
 
+local function updateNotice()
+    local message
+    if player:GetAttribute("WeeklyStartsAt") then
+        message = player:GetAttribute("WeeklySplitText")
+    else
+        message = player:GetAttribute("WindEffect")
+        local expiresAt = player:GetAttribute("NoticeUntil")
+        if not message and (not expiresAt or expiresAt > workspace:GetServerTimeNow()) then
+            message = player:GetAttribute("Notice")
+        end
+    end
+    notice.Text = message or ""
+    notice.Visible = notice.Text ~= ""
+end
+
+local function updateGuide()
+    local target = guide.Adornee
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local nearby = target ~= nil and root ~= nil and (root.Position - target.Position).Magnitude <= 56
+    guide.Enabled = nearby
+    waypoint.Enabled = nearby and waypoint.Adornee ~= nil
+end
+
 local function update()
     local egg = player:GetAttribute("EggName")
+    local carrying = egg ~= nil and egg ~= ""
     local ability = Rules.Abilities[player:GetAttribute("EggAbility")]
-    local best = player:GetAttribute("EquippedPet")
     local tier = player:GetAttribute("SpeedTier") or 1
-    local cost = Rules.UpgradeCosts[tier]
-    stats.Text = string.format("Монеты %d  ·  Скорость %d/5", player:GetAttribute("Coins") or 0, tier)
-    pet.Text = if egg and egg ~= "" then "Несёшь яйцо: " .. egg
-        elseif best and best ~= "" then "Питомец: " .. best
-        else "Питомец появится после вылупления"
-    objective.Text = if ability then ability.name .. " · " .. ability.hint
-        elseif egg and egg ~= "" then "Цель: успей к инкубатору"
-        elseif player:GetAttribute("Delivered") then "Яйцо спасено · жди следующего забега"
-        elseif cost then "Следующая тренировка: " .. cost .. " монет"
-        else "Выбирай остров и возвращайся до закрытия"
+    stats.Text = string.format("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
+    objective.Text = if carrying and ability then "В инкубатор  ·  " .. ability.name .. ": " .. ability.hint
+        elseif carrying then "Донеси яйцо до инкубатора"
+        elseif player:GetAttribute("Delivered") then "Яйцо спасено"
+        else ""
     local step = player:GetAttribute("OnboardingStep")
     local target
     if (step == 1 or step == 2) and not player:GetAttribute("Delivered") then
-        if egg and egg ~= "" then
-            objective.Text = "Донеси яйцо до подсвеченного инкубатора"
+        if carrying then
             target = hatchTarget.Value
         elseif runOpen then
             objective.Text = "Забери яйцо на Луговом острове"
             target = eggTarget.Value
         else
-            objective.Text = "Подойди к воротам и дождись старта"
+            objective.Text = "Дождись старта у ворот"
             target = gateTarget.Value
         end
-    elseif step == 3 and (not egg or egg == "") then
-        objective.Text = "Открой «Питомцы» и попробуй новый забег"
+    elseif step == 3 and not carrying then
+        objective.Text = "Открой коллекцию питомцев"
     end
     local weeklyStart = player:GetAttribute("WeeklyStartsAt")
-    exitControls.Visible = weeklyStart ~= nil
     if exitAttempt and exitAttempt ~= weeklyStart then
         exitAttempt = nil
-        showExitConfirmation(false)
     end
+    showExitConfirmation(exitAttempt ~= nil)
     local weeklyStep = player:GetAttribute("WeeklyStep")
     local weeklyPoint = weeklyTargets[Rules.Weekly.order[weeklyStep]]
     if weeklyPoint then
-        local progress = string.format("%d / %d", weeklyStep, #Rules.Weekly.order)
         objective.Text = Rules.Weekly.labels[weeklyStep]
-        stats.Text = "Этап " .. progress .. "  ·  Скорость " .. Rules.Weekly.tier
-        pet.Text = if weeklyStep > Rules.Weekly.eggStep then "Несёшь тренировочное яйцо" else "Путь к тренировочному яйцу"
+        stats.Text = string.format("Этап %d/%d", weeklyStep, #Rules.Weekly.order)
         target = weeklyPoint.Value
-        waypointText.Text = progress .. "  ↓"
     elseif weeklyStart then
-        stats.Text = "Забег недели · скорость " .. Rules.Weekly.tier .. " для всех"
-        pet.Text = ""
-        objective.Text = "Приготовься к старту"
+        stats.Text = "Скорость " .. Rules.Weekly.tier .. " у всех"
+        objective.Text = "Пройди метки и верни яйцо"
         target = nil
     end
     waypoint.Adornee = if weeklyPoint then target else nil
-    waypoint.Enabled = waypoint.Adornee ~= nil
     guide.Adornee = target
-    guide.Enabled = target ~= nil
-    local wind = player:GetAttribute("WindEffect")
-    notice.Text = if weeklyStep then player:GetAttribute("WeeklySplitText") or ""
-        else wind or player:GetAttribute("Notice") or ""
+    objective.Visible = objective.Text ~= ""
+    updateGuide()
+    updateNotice()
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyStep", "WeeklyStartsAt", "WeeklySplitText" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
+end
+for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do
+    player:GetAttributeChangedSignal(name):Connect(updateNotice)
 end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do
     target:GetPropertyChangedSignal("Value"):Connect(update)
@@ -222,7 +265,7 @@ while true do
             update()
         end
         local closing = open and left <= 5
-        local phase = if closing then "ВОРОТА ЗАКРЫВАЮТСЯ" elseif open then "ЗАБЕГ" else "ПОДГОТОВКА"
+        local phase = if closing then "Ворота закроются" elseif open then "Забег" else "Подготовка"
         timer.Text = string.format("%s  ·  %02d сек", phase, left)
         timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
         local egg = player:GetAttribute("EggName")
@@ -231,12 +274,14 @@ while true do
     local endsAt = player:GetAttribute("WeeklyEndsAt")
     if endsAt then
         local left = math.max(0, math.ceil(endsAt - workspace:GetServerTimeNow()))
-        timer.Text = string.format("ЗАБЕГ НЕДЕЛИ  ·  %02d сек", left)
+        timer.Text = string.format("Забег недели  ·  %02d сек", left)
         timer.TextColor3 = if left <= 5 then Color3.fromRGB(255, 147, 137) else colors.gold
     elseif weeklyStart then
         local left = math.max(1, math.ceil(weeklyStart - workspace:GetServerTimeNow()))
-        timer.Text = string.format("СТАРТ ЧЕРЕЗ  ·  %d", left)
+        timer.Text = string.format("Старт через %d", left)
         timer.TextColor3 = colors.gold
     end
+    updateGuide()
+    updateNotice()
     task.wait(0.2)
 end

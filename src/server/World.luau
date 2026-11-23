@@ -30,33 +30,36 @@ local function part(parent, name, size, position, color, collision)
     return prop
 end
 
-local function sign(anchor, title, subtitle)
+local function sign(anchor, text, eggDetails)
     local plate = Instance.new("BillboardGui")
-    plate.Size = UDim2.fromScale(13, 4)
-    plate.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
-    plate.MaxDistance = 55
+    plate.Name = "LocalSign"
+    plate.Size = if eggDetails then UDim2.fromOffset(178, 82) else UDim2.fromOffset(126, 36)
+    plate.StudsOffsetWorldSpace = Vector3.new(0, anchor.Size.Y / 2 + (if eggDetails then 2.4 else 1.5), 0)
+    plate.MaxDistance = if eggDetails then 36 else 30
     plate.LightInfluence = 0
-    plate.AlwaysOnTop = true
+    plate.AlwaysOnTop = false
     plate.Parent = anchor
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.fromScale(1, 1)
     label.BackgroundColor3 = Colors.plum
-    label.BackgroundTransparency = 0.07
+    label.BackgroundTransparency = 0.18
     label.TextColor3 = Colors.cream
     label.Font = Enum.Font.GothamBold
-    label.TextScaled = true
-    label.Text = title .. "\n" .. subtitle
+    label.TextSize = 12
+    label.TextWrapped = true
+    label.Text = text
     label.Parent = plate
-    Instance.new("UICorner", label).CornerRadius = UDim.new(0.2, 0)
-    Instance.new("UIPadding", label).PaddingBottom = UDim.new(0.1, 0)
+    Instance.new("UICorner", label).CornerRadius = UDim.new(0, 6)
+    local padding = Instance.new("UIPadding", label)
+    padding.PaddingLeft = UDim.new(0, 4)
+    padding.PaddingRight = UDim.new(0, 4)
     return label
 end
 
-local function prompt(anchor, action, object)
+local function prompt(anchor, action)
     local interaction = Instance.new("ProximityPrompt")
     interaction.ActionText = action
-    interaction.ObjectText = object
     interaction.MaxActivationDistance = 12
     interaction.RequiresLineOfSight = false
     interaction.Parent = anchor
@@ -107,10 +110,10 @@ local function buildWindTrail(parent, fromX, toX, anchorAbility)
     local signs = {}
     for _, x in ipairs({ fromX, toX }) do
         local marker = part(parent, "Флюгер", Vector3.new(0.6, 3, 0.6), Vector3.new(x, 1.5, lane + 3.5), Colors.azure, false)
-        table.insert(signs, sign(marker, "ВЕТРОВАЯ ТРОПА", "Штиль"))
+        table.insert(signs, sign(marker, "Ветровая тропа\nШтиль"))
         local bridgeMarker = part(parent, "Указатель моста", Vector3.new(0.6, 3, 0.6),
             Vector3.new(x, 1.5, -8), Colors.wood, false)
-        sign(bridgeMarker, "ОБЫЧНЫЙ МОСТ", "Постоянная скорость")
+        sign(bridgeMarker, "Обходной мост")
     end
 
     local bends = {
@@ -129,14 +132,14 @@ local function buildWindTrail(parent, fromX, toX, anchorAbility)
 
     local anchor = part(parent, "Стойка якоря", Vector3.new(1.5, 2, 1.5), Vector3.new(toX + 3, 1, lane - 3),
         Colors.amber, false)
-    sign(anchor, anchorAbility.name, string.format(anchorAbility.effect, anchorAbility.duration))
-    local anchorPrompt = prompt(anchor, "Активировать", anchorAbility.name)
+    sign(anchor, anchorAbility.name)
+    local anchorPrompt = prompt(anchor, "Активировать")
     anchorPrompt.MaxActivationDistance = 7
 
     local lever = part(parent, "Рычаг ветра", Vector3.new(1.5, 2.4, 1.5),
         Vector3.new(fromX - 4, 1.2, lane - 4), Colors.lilac, false)
-    local leverLabel = sign(lever, "РЫЧАГ ВЕТРА", "Помоги игроку с яйцом")
-    local leverPrompt = prompt(lever, "Развернуть ветер", "Рычаг ветра")
+    local leverLabel = sign(lever, "Рычаг ветра")
+    local leverPrompt = prompt(lever, "Развернуть ветер")
     leverPrompt.MaxActivationDistance = 7
 
     return {
@@ -152,17 +155,14 @@ function World.showWind(trail, direction, used, overrideActive)
     elseif direction < 0 then
         description = "Ветер к Луговому"
     end
-    if overrideActive then
-        description ..= " · рычаг"
-    end
     local leverState = if overrideActive then "Ветер развёрнут"
-        elseif used then "До следующего раунда"
+        elseif used then "Уже использован"
         elseif direction == 0 then "Штиль"
-        elseif direction < 0 then "Ветер уже помогает вернуться"
-        else "Помоги игроку с яйцом"
-    trail.leverLabel.Text = "РЫЧАГ ВЕТРА\n" .. leverState
+        elseif direction < 0 then "Ветер к лагерю"
+        else "Помоги с яйцом"
+    trail.leverLabel.Text = "Рычаг ветра\n" .. leverState
     for _, label in ipairs(trail.signs) do
-        label.Text = "ВЕТРОВАЯ ТРОПА\n" .. description
+        label.Text = "Ветровая тропа\n" .. description
     end
     local rotation = if direction < 0 then math.pi else 0
     for _, arrow in ipairs(trail.arrows) do
@@ -175,20 +175,17 @@ function World.showWind(trail, direction, used, overrideActive)
     end
 end
 
-local function buildStormRelay(parent, originX, landingX, ability, trial)
+local function buildStormRelay(parent, originX, landingX)
     local origin = part(parent, "Грозовой маяк", Vector3.new(2, 4, 2),
         Vector3.new(originX, 2, 8), Colors.lilac, false)
     origin.Material = Enum.Material.Neon
-    local label = sign(origin, ability.name, ability.effect .. "\n"
-        .. trial.name .. " · доставь яйцо при " .. trial.secondsLeft .. "+ сек.")
-    label.Parent.Size = UDim2.fromScale(19, 6)
-    local launch = prompt(origin, "Перенестись", ability.name)
+    sign(origin, "Грозовой маяк")
+    local launch = prompt(origin, "Перенестись")
     launch.MaxActivationDistance = 7
 
     local landing = part(parent, "Приёмный маяк", Vector3.new(7, 0.3, 7),
         Vector3.new(landingX, 0.16, 8), Colors.lilac, false)
     landing.Material = Enum.Material.Neon
-    sign(landing, "ПРИЁМНЫЙ МАЯК", "С Грозового острова")
     local destination = landing.Position + Vector3.new(0, 4, 0)
     local pulse = part(parent, "Грозовой импульс", Vector3.new(0.55, 0.55, (origin.Position - destination).Magnitude),
         (origin.Position + destination) * 0.5, Colors.lilac, false)
@@ -225,23 +222,22 @@ local function buildWeekly(parent)
 
     local points = {}
     for _, marker in ipairs({
-        { id = "Finish", x = -108, z = 0, title = "СТАРТ И ФИНИШ" },
-        { id = "First", x = -138, z = -13, title = "МЕТКА 1" },
-        { id = "Second", x = -167, z = 13, title = "МЕТКА 2" },
-        { id = "Egg", x = -206, z = 0, title = "ТРЕНИРОВОЧНОЕ ЯЙЦО" },
+        { id = "Finish", x = -108, z = 0 },
+        { id = "First", x = -138, z = -13 },
+        { id = "Second", x = -167, z = 13 },
+        { id = "Egg", x = -206, z = 0 },
     }) do
         local plate = part(parent, marker.id, Vector3.new(7, 0.16, 7), Vector3.new(marker.x, 0.08, marker.z),
             if marker.id == "Egg" then Colors.cream else Colors.azure, false)
         plate.Material = Enum.Material.Neon
         points[marker.id] = plate
-        sign(plate, marker.title, if marker.id == "Egg" then "Вернись через обе метки" else "Забег недели")
     end
 
     local entrance = part(parent, "Вход на трассу недели", Vector3.new(4, 0.3, 4),
         Vector3.new(-15, 0.2, -8), Colors.lilac, false)
-    sign(entrance, "ЗАБЕГ НЕДЕЛИ", "Одинаковая скорость")
+    sign(entrance, "Забег недели")
     return {
-        prompt = prompt(entrance, "Начать забег", "Забег недели"),
+        prompt = prompt(entrance, "Начать забег"),
         points = points,
     }
 end
@@ -259,7 +255,7 @@ function World.showEgg(display, egg, rules)
         .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
         .. "\n" .. ability
         .. "\nРедкий питомец " .. display.rareChance[egg.rarity] .. "%"
-    display.prompt.ObjectText = egg.name
+    display.label.TextColor3 = if egg.rarity == "Редкое" then Colors.amber else Colors.cream
 end
 
 function World.showVine(vine, active)
@@ -302,15 +298,15 @@ function World.build(rules)
 
     local hatch = part(scene, "Инкубатор", Vector3.new(8, 0.4, 8), Vector3.new(14, 0.2, 0), Colors.cream, true)
     local shop = part(scene, "Тренировка", Vector3.new(7, 0.4, 7), Vector3.new(-6, 0.2, 11), Colors.azure, true)
-    sign(hatch, "ИНКУБАТОР", "Сдай яйцо")
-    sign(shop, "ТРЕНИРОВКА", "Увеличь скорость")
+    sign(hatch, "Инкубатор")
+    sign(shop, "Тренировка")
 
     runway(scene, 24, 50, -9)
     local vine = part(scene, "Мост из лиан", Vector3.new(26, 0.8, 8), Vector3.new(37, -0.4, 8), Colors.grass, false)
     World.showVine(vine, false)
     local sprout = part(scene, "Росток", Vector3.new(2, 1.5, 2), Vector3.new(52, 0.75, 8), Colors.grass, false)
-    sign(sprout, "ЛИАНА", "Выращивает мост в лагерь")
-    local vinePrompt = prompt(sprout, "Вырастить мост", "Лиана")
+    sign(sprout, "Росток лианы")
+    local vinePrompt = prompt(sprout, "Вырастить мост")
     vinePrompt.MaxActivationDistance = 8
     local gate = part(scene, "Ворота", Vector3.new(1, 10, 32), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
     gate.Material = Enum.Material.Neon
@@ -327,7 +323,7 @@ function World.build(rules)
         elseif previousX then
             runway(scene, previousX + 13, vault.x - 13, 0)
             if index == 3 then
-                stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8, rules.Abilities.relay, rules.StormTrial)
+                stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8)
             end
         end
         island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))
@@ -339,13 +335,11 @@ function World.build(rules)
         part(scene, "Пьедестал", Vector3.new(5, 1, 5), Vector3.new(vault.x, 0.5, 0), Colors.plum, false)
         local egg = part(scene, "Яйцо", Vector3.new(2.4, 3.2, 2.4), Vector3.new(vault.x, 2.6, 0), accent, false)
         egg.Shape = Enum.PartType.Ball
-        local eggLabel = sign(egg, vault.name, "Скорость " .. vault.tier)
-        eggLabel.Parent.Size = UDim2.fromScale(17, 7)
-        eggLabel.Parent.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
+        local eggLabel = sign(egg, vault.name, true)
         vaultDisplays[index] = {
             part = egg,
             label = eggLabel,
-            prompt = prompt(egg, "Забрать яйцо", vault.name),
+            prompt = prompt(egg, "Забрать яйцо"),
             tier = vault.tier,
             rareChance = rules.RarePetChance,
         }
@@ -368,8 +362,8 @@ function World.build(rules)
         stormRelay = stormRelay,
         vine = vine,
         vinePrompt = vinePrompt,
-        hatch = prompt(hatch, "Вылупить", "Инкубатор"),
-        shop = prompt(shop, "Тренироваться", "Скорость"),
+        hatch = prompt(hatch, "Вылупить"),
+        shop = prompt(shop, "Тренироваться"),
         vaults = vaultDisplays,
     }
 end
