@@ -3,10 +3,11 @@ local Season = {}
 function Season.rollover(entry, definition, week)
     local progress = entry.season
     if not progress or progress.id ~= definition.id then
-        entry.season = { id = definition.id, week = week, xp = 0, counts = {}, claimed = {} }
+        entry.season = { id = definition.id, week = week, xp = 0, counts = {}, claimed = {}, deliveryBests = {} }
     elseif week > progress.week then
         progress.week = week
         table.clear(progress.counts)
+        table.clear(progress.deliveryBests)
     else
         return false
     end
@@ -35,6 +36,28 @@ function Season.advance(entry, definition, week, activity)
         end
     end
     return changed
+end
+
+function Season.recordDelivery(entry, rules, week, vault, elapsed)
+    local changed = Season.rollover(entry, rules.Season, week)
+    local progress = entry.season
+    if progress.week ~= week then
+        return changed
+    end
+
+    local previous = progress.deliveryBests[vault.id]
+    local milliseconds = rules.improvedDelivery(nil, elapsed)
+    local best = milliseconds and math.max(10, math.round(milliseconds / 10) * 10)
+    if not best or (previous and best >= previous) then
+        return changed
+    end
+    progress.deliveryBests[vault.id] = best
+    if previous then
+        local before = progress.xp
+        Season.advance(entry, rules.Season, week, "record")
+        return true, before < progress.xp and progress.xp - before or nil
+    end
+    return true
 end
 
 function Season.claim(entry, definition, week, index)

@@ -209,6 +209,15 @@ local function updateSeason()
             local count = player:GetAttribute("SeasonQuest_" .. quest.id) or 0
             table.insert(lines, string.format("%s · %d/%d · +%d XP", quest.label, count, quest.goal, quest.xp))
         end
+        local times = {}
+        for _, vault in ipairs(Rules.Vaults) do
+            local best = player:GetAttribute("SeasonDeliveryBest_" .. vault.id)
+            if best then
+                table.insert(times, vault.name .. " · " .. Rules.deliveryTimeText(best))
+            end
+        end
+        table.insert(lines, if #times > 0 then "Лучшие доставки недели\n" .. table.concat(times, "\n")
+            else "Первая доставка в биоме задаёт время для сравнения.")
     else
         table.insert(lines, "Загружаем прогресс сезона…")
     end
@@ -234,6 +243,9 @@ end)
 player:GetAttributeChangedSignal("SeasonXP"):Connect(updateSeason)
 for _, quest in ipairs(season.quests) do
     player:GetAttributeChangedSignal("SeasonQuest_" .. quest.id):Connect(updateSeason)
+end
+for _, vault in ipairs(Rules.Vaults) do
+    player:GetAttributeChangedSignal("SeasonDeliveryBest_" .. vault.id):Connect(updateSeason)
 end
 for index in ipairs(season.rewards) do
     player:GetAttributeChangedSignal("SeasonClaimed_" .. index):Connect(updateSeason)

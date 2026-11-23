@@ -201,6 +201,9 @@ local function publishSeason(player, entry)
     for _, quest in ipairs(Rules.Season.quests) do
         player:SetAttribute("SeasonQuest_" .. quest.id, progress.counts[quest.id] or 0)
     end
+    for _, vault in ipairs(Rules.Vaults) do
+        player:SetAttribute("SeasonDeliveryBest_" .. vault.id, progress.deliveryBests[vault.id])
+    end
     for index in ipairs(Rules.Season.rewards) do
         player:SetAttribute("SeasonClaimed_" .. index, progress.claimed[tostring(index)] == true)
     end
@@ -636,7 +639,8 @@ local displayedWeek
 local function hatch(player, entry, root, secondsLeft, now, week)
     local egg = entry.egg
     local vault = entry.eggVault
-    local personalBest = Rules.improvedDelivery(entry.deliveryRecords[vault.id], now - entry.pickupAt)
+    local elapsed = now - entry.pickupAt
+    local personalBest = Rules.improvedDelivery(entry.deliveryRecords[vault.id], elapsed)
     if personalBest then
         entry.deliveryRecords[vault.id] = personalBest
         player:SetAttribute("DeliveryRecord_" .. vault.id, personalBest)
@@ -666,7 +670,8 @@ local function hatch(player, entry, root, secondsLeft, now, week)
     if routeCompleted and Season.advance(entry, Rules.Season, week, "route") then
         seasonChanged = true
     end
-    if seasonChanged then
+    local recordChanged, recordXP = Season.recordDelivery(entry, Rules, week, vault, elapsed)
+    if seasonChanged or recordChanged then
         publishSeason(player, entry)
     end
     publishBiomeProgress(player, entry, vault.id)
@@ -684,7 +689,7 @@ local function hatch(player, entry, root, secondsLeft, now, week)
     publish(player, entry, "")
     runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins + bonus, isNew,
         if unlockedTrail then Rules.StormTrial.name else nil, personalBest, bonus,
-        if materialGain > 0 then vault.id else nil, if catalystAwarded then vault.name else nil)
+        if materialGain > 0 then vault.id else nil, if catalystAwarded then vault.name else nil, recordXP)
 end
 
 local function syncRound()

@@ -91,7 +91,8 @@ function Profile.mutatePet(entry, mutation)
     return true
 end
 
-local function readSeason(stored, definition)
+local function readSeason(stored, rules)
+    local definition = rules.Season
     local lastReward = definition.rewards[#definition.rewards]
     if type(stored) ~= "table" or stored.id ~= definition.id
         or not wholeNumber(stored.week, 0, MAX_COUNTER)
@@ -100,6 +101,15 @@ local function readSeason(stored, definition)
     end
 
     local season = { id = definition.id, week = stored.week, xp = stored.xp, counts = {}, claimed = {} }
+    season.deliveryBests = {}
+    if type(stored.deliveryBests) == "table" then
+        for _, vault in ipairs(rules.Vaults) do
+            local time = stored.deliveryBests[vault.id]
+            if wholeNumber(time, 1, rules.RunSeconds * 1000) then
+                season.deliveryBests[vault.id] = time
+            end
+        end
+    end
     if type(stored.counts) == "table" then
         for _, quest in ipairs(definition.quests) do
             local count = stored.counts[quest.id]
@@ -128,7 +138,7 @@ function Profile.read(stored, catalog, rules)
 
     local record = Profile.new(stored.coins)
     record.tier = stored.tier
-    record.season = readSeason(stored.season, rules.Season)
+    record.season = readSeason(stored.season, rules)
     record.deliveries = readCounts(stored.deliveries, rules.Vaults)
     record.prizeWins = readCounts(stored.prizeWins, rules.Prizes)
     record.materials = readCounts(stored.materials, rules.Vaults)
@@ -213,6 +223,7 @@ function Profile.snapshot(entry)
         record.season = {
             id = season.id, week = season.week, xp = season.xp,
             counts = table.clone(season.counts), claimed = table.clone(season.claimed),
+            deliveryBests = table.clone(season.deliveryBests),
         }
     end
     record.weeklyRecord = entry.weeklyRecord

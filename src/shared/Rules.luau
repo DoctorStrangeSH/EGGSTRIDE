@@ -194,6 +194,7 @@ Rules.Season = {
     quests = {
         { id = "delivery", label = "Доставь яйца в любых биомах", goal = 3, xp = 30 },
         { id = "route", label = "Доставь яйца по особым маршрутам", goal = 2, xp = 40 },
+        { id = "record", label = "Улучши время доставки недели в одном биоме", goal = 1, xp = 40 },
         { id = "weekly", label = "Финишируй с зачётом в забеге недели", goal = 1, xp = 50 },
     },
     rewards = {

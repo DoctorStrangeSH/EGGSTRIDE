@@ -62,4 +62,38 @@ local oldSeason = Profile.read(snapshot, { [pet.id] = pet }, Rules)
 assert(not oldSeason.season and oldSeason.owned[pet.id])
 assert(not Profile.read(Profile.new(15), {}, Rules).season)
 
+local runner = {
+    coins = 15, tier = 1, materials = {}, ownedPets = {},
+    deliveries = {}, prizeWins = {}, catalysts = {}, discoveries = {},
+    deliveryRecords = { meadow = 10000 },
+}
+local meadow, amber = Rules.Vaults[1], Rules.Vaults[2]
+assert(Season.recordDelivery(runner, Rules, 20, meadow, 15))
+assert(runner.season.deliveryBests.meadow == 15000 and runner.season.xp == 0)
+assert(Season.recordDelivery(runner, Rules, 20, amber, 25))
+assert(runner.season.deliveryBests.amber == 25000 and runner.season.xp == 0)
+assert(not Season.recordDelivery(runner, Rules, 20, meadow, 16))
+assert(not Season.recordDelivery(runner, Rules, 20, meadow, 14.999))
+assert(not Season.recordDelivery(runner, Rules, 20, meadow, 0))
+
+local checkpoint = Profile.snapshot(runner)
+assert(Profile.read(checkpoint, {}, Rules).season.deliveryBests.meadow == 15000)
+local changed, earned = Season.recordDelivery(runner, Rules, 20, meadow, 14.98)
+assert(changed and earned == 40 and runner.season.counts.record == 1)
+assert(runner.deliveryRecords.meadow == 10000)
+changed, earned = Season.recordDelivery(runner, Rules, 20, amber, 23)
+assert(changed and not earned and runner.season.xp == 40)
+assert(checkpoint.season.deliveryBests.amber == 25000)
+
+checkpoint.season.deliveryBests.meadow = -1
+checkpoint.season.deliveryBests.unknown = 25000
+local validated = Profile.read(checkpoint, {}, Rules).season.deliveryBests
+assert(not validated.meadow and not validated.unknown and validated.amber == 25000)
+checkpoint.season.deliveryBests = nil
+local migrated = Profile.read(checkpoint, {}, Rules)
+assert(not next(migrated.season.deliveryBests))
+assert(Season.recordDelivery(runner, Rules, 21, amber, 24))
+assert(not runner.season.deliveryBests.meadow and runner.season.deliveryBests.amber == 24000)
+assert(runner.season.xp == 40 and not runner.season.counts.record)
+assert(not Season.recordDelivery(runner, Rules, 20, amber, 12))
 print("Eggstride season: OK")
