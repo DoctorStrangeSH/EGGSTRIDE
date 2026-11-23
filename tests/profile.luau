@@ -13,6 +13,11 @@ for _, pet in ipairs(Rules.RelicPets) do
     catalog[pet.id] = pet
 end
 
+for _, recipe in ipairs(Rules.BreedingRecipes) do
+    assert(not catalog[recipe.offspring.id])
+    catalog[recipe.offspring.id] = recipe.offspring
+end
+
 local defaults = Profile.new(Rules.StartCoins)
 assert(defaults.tier == 1 and defaults.coins == Rules.StartCoins and not next(defaults.owned) and defaults.onboarding == 0 and not defaults.stormTrailUnlocked)
 
@@ -120,5 +125,42 @@ local cleanProgress = Profile.read(progressSnapshot, catalog, Rules)
 assert(cleanProgress.deliveries.meadow == 2 and not cleanProgress.deliveries.unknown and not cleanProgress.deliveries.amber)
 assert(cleanProgress.prizeWins.storm == 2 and not cleanProgress.prizeWins.meadow and not cleanProgress.prizeWins.amber)
 assert(cleanProgress.materials.meadow == 1 and not cleanProgress.materials.storm)
+
+for _, recipe in ipairs(Rules.BreedingRecipes) do
+    local vaultId = recipe.vault.id
+    local offspringId = recipe.offspring.id
+    local common = recipe.vault.pets.common
+    local rare = recipe.vault.pets.rare
+    local breeder = {
+        materials = { [vaultId] = recipe.cost },
+        ownedPets = { [common.id] = common },
+    }
+    assert(not Profile.breed(breeder, recipe))
+    assert(breeder.materials[vaultId] == recipe.cost and not breeder.ownedPets[offspringId])
+
+    breeder.ownedPets[rare.id] = rare
+    breeder.materials[vaultId] = recipe.cost - 1
+    assert(not Profile.breed(breeder, recipe))
+    assert(breeder.materials[vaultId] == recipe.cost - 1 and not breeder.ownedPets[offspringId])
+
+    breeder.materials[vaultId] = recipe.cost + 1
+    assert(Profile.breed(breeder, recipe))
+    assert(breeder.ownedPets[common.id] == common and breeder.ownedPets[rare.id] == rare)
+    assert(breeder.materials[vaultId] == 1 and breeder.ownedPets[offspringId] == recipe.offspring)
+    breeder.materials[vaultId] = recipe.cost
+    assert(not Profile.breed(breeder, recipe) and breeder.materials[vaultId] == recipe.cost)
+end
+
+local recipe = Rules.BreedingRecipes[1]
+entry.ownedPets[recipe.vault.pets.common.id] = recipe.vault.pets.common
+entry.ownedPets[recipe.vault.pets.rare.id] = recipe.vault.pets.rare
+entry.materials[recipe.vault.id] = recipe.cost + 1
+local previousDeliveries = entry.deliveries[recipe.vault.id]
+assert(Profile.breed(entry, recipe))
+entry.pet = recipe.offspring
+local breedingSave = Profile.write(opened, Profile.snapshot(entry), "server_a", 182, true)
+local breedingProfile = Profile.acquire(breedingSave, "server_e", 183, catalog, Rules)
+assert(breedingProfile.owned[recipe.offspring.id] and breedingProfile.equipped == recipe.offspring.id)
+assert(breedingProfile.materials[recipe.vault.id] == 1 and breedingProfile.deliveries[recipe.vault.id] == previousDeliveries)
 
 print("Eggstride profiles: OK")

@@ -22,6 +22,13 @@ for _, pet in ipairs(Rules.RelicPets) do
     petCatalog[pet.id] = pet
 end
 
+local recipesByOffspring = {}
+for _, recipe in ipairs(Rules.BreedingRecipes) do
+    local pet = recipe.offspring
+    petCatalog[pet.id] = pet
+    recipesByOffspring[pet.id] = recipe
+end
+
 local weeklyGroup = "EggstrideWeeklyRunners"
 if not workspace:IsCollisionGroupRegistered(weeklyGroup) then
     workspace:RegisterCollisionGroup(weeklyGroup)
@@ -52,6 +59,10 @@ round.Parent = Shared
 local equipPet = Instance.new("RemoteEvent")
 equipPet.Name = "EquipPet"
 equipPet.Parent = Shared
+
+local breedPet = Instance.new("RemoteEvent")
+breedPet.Name = "BreedPet"
+breedPet.Parent = Shared
 
 local runFeedback = Instance.new("RemoteEvent")
 runFeedback.Name = "RunFeedback"
@@ -315,6 +326,7 @@ local function join(player)
         delivered = false,
         ownedPets = {},
         nextEquipAt = 0,
+        nextBreedAt = 0,
     }
     for id in pairs(record.owned) do
         entry.ownedPets[id] = petCatalog[id]
@@ -843,6 +855,28 @@ updatePreference.OnServerEvent:Connect(function(player, attribute, value)
     if field and entry[field] ~= value then
         entry[field] = value
         player:SetAttribute(attribute, value)
+    end
+end)
+
+breedPet.OnServerEvent:Connect(function(player, offspringId)
+    local entry = entries[player]
+    if closing or not entry or entry.weekly or ProfileStore.expired(entry.session)
+        or typeof(offspringId) ~= "string" or #offspringId > 32 then
+        return
+    end
+
+    local now = os.clock()
+    if now < entry.nextBreedAt then
+        return
+    end
+    entry.nextBreedAt = now + 0.25
+
+    local recipe = recipesByOffspring[offspringId]
+    if recipe and Profile.breed(entry, recipe) then
+        local vaultId = recipe.vault.id
+        player:SetAttribute("OwnsPet_" .. offspringId, true)
+        player:SetAttribute("Material_" .. vaultId, entry.materials[vaultId])
+        publish(player, entry, "В питомнике появился новый питомец: " .. recipe.offspring.name .. ".")
     end
 end)
 

@@ -51,6 +51,22 @@ function Profile.recordHatch(entry, vault, pet, prizeId)
     return isNew, materialGain
 end
 
+function Profile.breed(entry, recipe)
+    local pet = recipe.offspring
+    local parents = recipe.vault.pets
+    local vaultId = recipe.vault.id
+    local stock = entry.materials[vaultId] or 0
+    if entry.ownedPets[pet.id] or not entry.ownedPets[parents.common.id]
+        or not entry.ownedPets[parents.rare.id] or stock < recipe.cost then
+        return false
+    end
+
+    -- Ownership and materials are snapshotted together from this profile.
+    entry.materials[vaultId] = stock - recipe.cost
+    entry.ownedPets[pet.id] = pet
+    return true
+end
+
 function Profile.read(stored, catalog, rules)
     if type(stored) ~= "table" or stored.version ~= Profile.VERSION
         or not wholeNumber(stored.coins, 0, 9e15) or not wholeNumber(stored.tier, 1, #rules.Speeds)

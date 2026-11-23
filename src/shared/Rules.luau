@@ -61,6 +61,20 @@ Rules.Vaults = {
         },
     },
 }
+Rules.BreedingRecipes = {
+    {
+        vault = Rules.Vaults[1], cost = 2,
+        offspring = { id = "bloom_moth", name = "Цветокрыл", rarity = "Редкий", color = { 158, 237, 125 }, form = "wings" },
+    },
+    {
+        vault = Rules.Vaults[2], cost = 3,
+        offspring = { id = "sun_shell", name = "Солнечный панцирник", rarity = "Редкий", color = { 244, 166, 75 }, form = "fins" },
+    },
+    {
+        vault = Rules.Vaults[3], cost = 4,
+        offspring = { id = "thunder_lynx", name = "Громорысь", rarity = "Эпический", color = { 141, 131, 251 }, form = "horns" },
+    },
+}
 Rules.Speeds = { 16, 20, 24, 30, 36 }
 Rules.UpgradeCosts = { 15, 35, 65, 95 }
 

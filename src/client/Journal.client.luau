@@ -4,6 +4,7 @@ local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(shared:WaitForChild("Rules"))
 local equipPet = shared:WaitForChild("EquipPet")
+local breedPet = shared:WaitForChild("BreedPet")
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -167,6 +168,75 @@ local function description(name, order, color)
     return label
 end
 
+local nurseryButton = textItem("TextButton", list, "Питомник  +", 14, palette.panel)
+nurseryButton.LayoutOrder = -6 - 2 * #Rules.BreedingRecipes
+nurseryButton.Size = UDim2.new(1, -8, 0, 44)
+fill(nurseryButton, palette.gold, 10)
+
+local nurseryExpanded = false
+local recipeCards = {}
+
+for index, recipe in ipairs(Rules.BreedingRecipes) do
+    local offspring = recipe.offspring
+    local common = recipe.vault.pets.common
+    local rare = recipe.vault.pets.rare
+    local order = nurseryButton.LayoutOrder + index * 2
+    local info = description("Recipe_" .. offspring.id, order - 1, palette.text)
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    local action = textItem("TextButton", list, "", 13, palette.panel)
+    action.LayoutOrder = order
+    action.Size = UDim2.new(1, -8, 0, 44)
+
+    local materialAttribute = "Material_" .. recipe.vault.id
+    local canBreed
+    local function updateRecipe()
+        local stock = player:GetAttribute(materialAttribute)
+        local hasCommon = player:GetAttribute("OwnsPet_" .. common.id) == true
+        local hasRare = player:GetAttribute("OwnsPet_" .. rare.id) == true
+        local owned = player:GetAttribute("OwnsPet_" .. offspring.id) == true
+        canBreed = stock ~= nil and stock >= recipe.cost and hasCommon and hasRare and not owned
+
+        local parents = string.format("%s + %s · %d/2", common.name, rare.name,
+            (if hasCommon then 1 else 0) + (if hasRare then 1 else 0))
+        local materials = string.format("%s · %d/%d", recipe.vault.material, stock or 0, recipe.cost)
+        info.Text = offspring.name .. " · " .. offspring.rarity
+            .. (if owned then "" else "\n" .. parents .. "\n" .. materials)
+        action.Text = if owned then "Уже в коллекции"
+            elseif stock == nil then "Загружаем материалы…"
+            elseif not (hasCommon and hasRare) then "Нужны оба родителя"
+            elseif stock < recipe.cost then "Нужны материалы"
+            else "Вывести питомца"
+        action.Active = canBreed
+        action.Selectable = canBreed
+        action.AutoButtonColor = canBreed
+        action.BackgroundColor3 = if owned then palette.mint elseif canBreed then palette.gold else palette.muted
+    end
+
+    fill(action, palette.muted, 10)
+    info.Visible = false
+    action.Visible = false
+    table.insert(recipeCards, { info = info, action = action })
+
+    for _, attribute in ipairs({ materialAttribute, "OwnsPet_" .. common.id, "OwnsPet_" .. rare.id, "OwnsPet_" .. offspring.id }) do
+        player:GetAttributeChangedSignal(attribute):Connect(updateRecipe)
+    end
+    action.Activated:Connect(function()
+        if canBreed then
+            breedPet:FireServer(offspring.id)
+        end
+    end)
+    updateRecipe()
+end
+
+nurseryButton.Activated:Connect(function()
+    nurseryExpanded = not nurseryExpanded
+    nurseryButton.Text = if nurseryExpanded then "Питомник  −" else "Питомник  +"
+    for _, card in ipairs(recipeCards) do
+        card.info.Visible = nurseryExpanded
+        card.action.Visible = nurseryExpanded
+    end
+end)
+
 local progressButton = textItem("TextButton", list, "Статистика и материалы  +", 14, palette.panel)
 progressButton.LayoutOrder = -5
 progressButton.Size = UDim2.new(1, -8, 0, 44)
@@ -307,6 +377,10 @@ for _, vault in ipairs(Rules.Vaults) do
     for _, pet in ipairs({ vault.pets.common, vault.pets.rare }) do
         addPetRow(pet, vault.name .. " остров", false)
     end
+end
+
+for _, recipe in ipairs(Rules.BreedingRecipes) do
+    addPetRow(recipe.offspring, "Питомник", false)
 end
 
 order += 1
