@@ -227,6 +227,7 @@ local function stopWeekly(player, entry)
     player:SetAttribute("WeeklyStartsAt", nil)
     player:SetAttribute("WeeklyEndsAt", nil)
     player:SetAttribute("WeeklyStep", nil)
+    player:SetAttribute("WeeklySplitText", nil)
     applySpeed(player, entry)
 end
 
@@ -432,8 +433,14 @@ local function finishWeekly(player, entry, root, now, week, completed)
     local best = Rules.improvedDelivery(previous, elapsed, Rules.Weekly.duration)
     local previousRanked = previous and entry.weeklyRecord.rankedTime
     local rankedBest = attempt.rankable and Rules.improvedDelivery(previousRanked, elapsed, Rules.Weekly.duration)
-    if best or rankedBest then
-        entry.weeklyRecord = { week = week, time = best or previous, rankedTime = rankedBest or previousRanked }
+    local reference = attempt.referenceSplits
+    local finishTime = attempt.splits[#Rules.Weekly.order]
+    local betterSplits = attempt.rankable and (not reference or finishTime < reference[#Rules.Weekly.order])
+    if best or rankedBest or betterSplits then
+        entry.weeklyRecord = {
+            week = week, time = best or previous, rankedTime = rankedBest or previousRanked,
+            rankedSplits = if betterSplits then attempt.splits else reference,
+        }
         player:SetAttribute("WeeklyBest", entry.weeklyRecord.time)
     end
     if rankedBest then
@@ -527,6 +534,8 @@ local function syncRound()
                         and Rules.weeklySplitPlausible(span, now - attempt.lastCheckpointAt, attempt.cargo ~= nil)
                     attempt.lastPoint = point
                     attempt.lastCheckpointAt = now
+                    local splitTime = math.max(1, math.round((now - attempt.startedAt) * 1000))
+                    attempt.splits[attempt.step] = splitTime
                     if attempt.step == #Rules.Weekly.order then
                         finishWeekly(player, entry, root, now, week, true)
                     else
@@ -535,6 +544,9 @@ local function syncRound()
                                 Vector3.new(1.8, 2.3, 1.8), Vector3.new(0, 0.5, -1.7))
                             applySpeed(player, entry)
                         end
+                        local reference = attempt.rankable and attempt.referenceSplits
+                        player:SetAttribute("WeeklySplitText",
+                            Rules.weeklySplitText(splitTime, reference and reference[attempt.step]))
                         attempt.step += 1
                         player:SetAttribute("WeeklyStep", attempt.step)
                     end
@@ -563,9 +575,11 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
         return
     end
     local character = player.Character
+    local week = Rules.weekId(os.time())
     local attempt = {
-        startsAt = now + Rules.Weekly.countdown, startRoot = root, week = Rules.weekId(os.time()),
-        step = 1, collisionGroups = {}, rankable = true,
+        startsAt = now + Rules.Weekly.countdown, startRoot = root, week = week,
+        step = 1, collisionGroups = {}, rankable = true, splits = {},
+        referenceSplits = if Rules.weeklyBest(entry.weeklyRecord, week) then entry.weeklyRecord.rankedSplits else nil,
         lastPoint = map.weekly.points.Finish.Position,
     }
     local function setRunnerCollision(part)

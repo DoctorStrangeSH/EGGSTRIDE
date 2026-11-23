@@ -197,10 +197,11 @@ local function update()
     guide.Adornee = target
     guide.Enabled = target ~= nil
     local wind = player:GetAttribute("WindEffect")
-    notice.Text = wind or player:GetAttribute("Notice") or ""
+    notice.Text = if weeklyStep then player:GetAttribute("WeeklySplitText") or ""
+        else wind or player:GetAttribute("Notice") or ""
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyStep", "WeeklyStartsAt" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "EquippedPet", "Delivered", "Notice", "WindEffect", "WeeklyStep", "WeeklyStartsAt", "WeeklySplitText" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do

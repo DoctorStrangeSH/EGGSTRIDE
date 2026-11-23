@@ -22,7 +22,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 local pet = catalog.dew_moth
 local entry = {
     coins = 77, tier = 2, weeklyRewardWeek = 20, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
-    onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200 }, delivered = true, egg = Rules.Vaults[1].eggs[1],
+    onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200, rankedSplits = { 2000, 4500, 6500, 9000, 12000, 15200 } }, delivered = true, egg = Rules.Vaults[1].eggs[1],
 }
 local snapshot = Profile.snapshot(entry)
 assert(snapshot.coins == 77 and snapshot.tier == 2 and snapshot.equipped == pet.id and snapshot.onboarding == 3)
@@ -47,6 +47,10 @@ assert(Rules.claimWeeklyReward(rejoined, 20, Rules.Weekly.rewardTime, true) == n
 assert(rejoined.muteRunSounds == true and rejoined.reduceCardMotion == true)
 assert(rejoined.weeklyRecord.week == 20 and rejoined.weeklyRecord.time == 14320
     and rejoined.weeklyRecord.rankedTime == 15200)
+assert(rejoined.weeklyRecord.rankedSplits[3] == 6500 and rejoined.weeklyRecord.rankedSplits[6] == 15200)
+snapshot.weeklyRecord.rankedSplits = { 2000, 4500, 4200, 9000, 12000, 15200 }
+local badSplits = Profile.read(snapshot, catalog, Rules).weeklyRecord
+assert(badSplits.rankedTime == 15200 and badSplits.rankedSplits == nil)
 snapshot.weeklyRecord = { week = 20, time = 14320, rankedTime = 500 }
 local invalidRanked = Profile.read(snapshot, catalog, Rules).weeklyRecord
 assert(invalidRanked.time == 14320 and invalidRanked.rankedTime == nil)

@@ -130,6 +130,20 @@ function Rules.deliveryTimeText(milliseconds)
     return (string.format("%.2f", milliseconds / 1000):gsub("%.", ",")) .. " сек."
 end
 
+function Rules.weeklySplitText(milliseconds, reference)
+    local time = Rules.deliveryTimeText(milliseconds)
+    if not reference then
+        return "От старта · " .. time
+    end
+
+    local delta = math.round((milliseconds - reference) / 10) * 10
+    if delta == 0 then
+        return time .. " · Вровень с рекордом"
+    end
+    local gap = Rules.deliveryTimeText(math.abs(delta))
+    return time .. " · " .. gap .. (if delta < 0 then " быстрее" else " медленнее")
+end
+
 function Rules.stormTrialComplete(egg, usedAbility, secondsLeft)
     return egg ~= nil and egg.ability == "relay" and usedAbility == true
         and secondsLeft >= Rules.StormTrial.secondsLeft

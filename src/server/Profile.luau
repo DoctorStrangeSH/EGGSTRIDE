@@ -46,6 +46,21 @@ function Profile.read(stored, catalog, rules)
             record.weeklyRecord.rankedTime = weekly.rankedTime
         end
     end
+    if record.weeklyRecord and record.weeklyRecord.rankedTime and type(weekly.rankedSplits) == "table" then
+        local splits = {}
+        local previous = 0
+        for index = 1, #rules.Weekly.order do
+            local time = weekly.rankedSplits[index]
+            if not wholeNumber(time, previous + 1, rules.Weekly.duration * 1000) then
+                break
+            end
+            splits[index] = time
+            previous = time
+        end
+        if #splits == #rules.Weekly.order and previous >= record.weeklyRecord.rankedTime then
+            record.weeklyRecord.rankedSplits = splits
+        end
+    end
     for id, owned in pairs(stored.owned) do
         if owned == true and catalog[id] then
             record.owned[id] = true
