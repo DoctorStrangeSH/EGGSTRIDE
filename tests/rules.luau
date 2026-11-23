@@ -1,58 +1,67 @@
 local Rules = require("../src/shared/Rules")
+local Loot = require("../src/server/Loot")
+local RoundPrize = require("../src/server/RoundPrize")
 
 local function phase(at, expectedOpen, expectedLeft)
     local open, left = Rules.clock(at)
     assert(open == expectedOpen and left == expectedLeft, "Unexpected phase at " .. at)
 end
 
-phase(0, false, 9)
-phase(8.5, false, 1)
-phase(9, true, 25)
-phase(33.5, true, 1)
-phase(34, false, 9)
-phase(43, true, 25)
+phase(0, false, 7)
+phase(6.5, false, 1)
+phase(7, true, 55)
+phase(61.5, true, 1)
+phase(62, false, 7)
+phase(69, true, 55)
 assert(Rules.speed(1, false) == 16)
 assert(Rules.speed(5, true) == 27)
 assert(Rules.StartCoins == Rules.UpgradeCosts[1])
-assert(Rules.canCollect(1, Rules.Vaults[1], false, true, false))
-assert(not Rules.canCollect(1, Rules.Vaults[2], false, true, false))
-assert(not Rules.canCollect(5, Rules.Vaults[3], true, true, false))
-assert(not Rules.canCollect(5, Rules.Vaults[3], false, false, false))
-assert(not Rules.canCollect(5, Rules.Vaults[3], false, true, true))
-assert(not Rules.canCollect(3, Rules.Vaults[3], false, true, false))
-assert(Rules.canCollect(4, Rules.Vaults[3], false, true, false))
-for _, vault in ipairs(Rules.Vaults) do
-    local outward = (vault.x - Rules.GateX) / Rules.speed(vault.tier, false)
-    local home = (vault.x - 14) / Rules.speed(vault.tier, true)
-    assert(outward + home < Rules.RunSeconds, "Impossible minimum-tier route: " .. vault.name)
-end
-local shellIds = {}
+assert(Rules.canCollect(false, true, false))
+assert(not Rules.canCollect(true, true, false))
+assert(not Rules.canCollect(false, false, false))
+assert(not Rules.canCollect(false, true, true))
+
+local prize = RoundPrize.new()
+assert(RoundPrize.claim(prize, "first"))
+assert(not RoundPrize.claim(prize, "second"))
+assert(not RoundPrize.deliver(prize, "second"))
+assert(not RoundPrize.release(prize, "second"))
+assert(RoundPrize.release(prize, "first"))
+assert(RoundPrize.claim(prize, "second"))
+assert(RoundPrize.deliver(prize, "second"))
+assert(not RoundPrize.deliver(prize, "second"))
+assert(not RoundPrize.claim(prize, "first"))
+assert(RoundPrize.claim(RoundPrize.new(), "first"))
+
 local petIds = {}
-for _, vault in ipairs(Rules.Vaults) do
+for index, vault in ipairs(Rules.Vaults) do
+    -- Budget extra distance for lateral movement and the detour around the wind trail.
+    local outward = (vault.x + 20) / Rules.speed(1, false)
+    local home = (vault.x - Rules.HatchX + 32) / Rules.speed(1, true)
+    assert(outward + home + 3 < Rules.RunSeconds, "Starter route budget: " .. vault.name)
+
     for _, pet in pairs(vault.pets) do
         assert(pet.id:match("^[a-z_]+$") and #pet.id <= 32, "Invalid companion id: " .. pet.id)
         assert(not petIds[pet.id], "Duplicate companion id: " .. pet.id)
         petIds[pet.id] = true
     end
-    local counts = {}
-    for roll = 1, 100 do
-        local egg = Rules.eggForRoll(vault, roll)
-        counts[egg] = (counts[egg] or 0) + 1
-    end
-    for _, egg in ipairs(vault.eggs) do
-        assert(counts[egg] == egg.weight, "Uneven pool: " .. egg.id)
-        assert(not shellIds[egg.id], "Species appears in multiple biome pools: " .. egg.id)
-        shellIds[egg.id] = true
-        assert(not egg.ability or Rules.Abilities[egg.ability], "Unknown egg ability: " .. egg.id)
-        local rare = 0
+    local ordinary = Loot.eggForRoll(index, 1)
+    local rare = Loot.eggForRoll(index, 100)
+    assert(ordinary ~= rare)
+    assert(ordinary.ability == rare.ability and Rules.Abilities[ordinary.ability])
+    assert(Loot.eggForRoll(index, ordinary.weight) == ordinary)
+    assert(Loot.eggForRoll(index, ordinary.weight + 1) == rare)
+    assert(ordinary.weight + rare.weight == 100)
+    for _, egg in ipairs({ ordinary, rare }) do
+        local rareCount = 0
         for roll = 1, 100 do
-            local result = Rules.hatchForRoll(vault, egg, roll)
+            local result = Loot.hatchForRoll(vault, egg, roll)
             assert(result == vault.pets.rare or result == vault.pets.common, "Wrong biome")
             if result == vault.pets.rare then
-                rare += 1
+                rareCount += 1
             end
         end
-        assert(rare == Rules.RarePetChance[egg.rarity], "Wrong hatch odds: " .. egg.id)
+        assert(rareCount == (if egg == ordinary then 15 else 35))
     end
 end
 assert(Rules.onboardingAfterPickup(1) == 2)
@@ -69,18 +78,14 @@ assert(Rules.windFactor(1, 20, true) == Rules.WindTailwind)
 assert(Rules.windFactor(-1, 20, false) == Rules.WindHeadwind)
 assert(Rules.windFactor(0, -20, true) == 1)
 assert(Rules.speed(2, true) * Rules.windFactor(1, -20, true) == 15)
-for _, egg in ipairs(Rules.Vaults[3].eggs) do
-    assert(egg.ability == "relay")
-end
-assert(Rules.abilityEffect(Rules.Abilities.relay) == "Переносит на Янтарный остров")
-assert(string.find(Rules.abilityEffect(Rules.Abilities.vine), tostring(Rules.Abilities.vine.duration), 1, true))
-local thunder = Rules.Vaults[3].eggs
+local thunder = { Loot.eggForRoll(3, 1), Loot.eggForRoll(3, 100) }
+assert(thunder[1].ability == "relay" and thunder[2].ability == "relay")
 local required = Rules.StormTrial.secondsLeft
 assert(Rules.stormTrialComplete(thunder[1], true, required))
 assert(Rules.stormTrialComplete(thunder[2], true, required))
 assert(not Rules.stormTrialComplete(thunder[1], true, required - 1))
 assert(not Rules.stormTrialComplete(thunder[1], false, required + 1))
-assert(not Rules.stormTrialComplete(Rules.Vaults[1].eggs[1], true, required + 1))
+assert(not Rules.stormTrialComplete(Loot.eggForRoll(1, 1), true, required + 1))
 assert(not Rules.stormTrialComplete(nil, true, required + 1))
 assert(Rules.canSwitchWind(1, false, true))
 assert(not Rules.canSwitchWind(1, false, false))
@@ -91,7 +96,7 @@ assert(Rules.improvedDelivery(nil, 10.235) == 10235)
 assert(Rules.improvedDelivery(10235, 10.234) == 10234)
 assert(Rules.improvedDelivery(10235, 10.235) == nil)
 assert(Rules.improvedDelivery(10235, 11) == nil)
-assert(Rules.improvedDelivery(nil, 0) == nil and Rules.improvedDelivery(nil, 26) == nil)
+assert(Rules.improvedDelivery(nil, 0) == nil and Rules.improvedDelivery(nil, Rules.RunSeconds + 1) == nil)
 assert(Rules.deliveryTimeText(10240) == "10,24 сек.")
 local monday = 4 * 86400
 assert(Rules.weekId(monday - 1) == -1 and Rules.weekId(monday) == 0)

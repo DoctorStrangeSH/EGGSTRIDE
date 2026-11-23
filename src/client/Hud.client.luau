@@ -9,6 +9,11 @@ local RunFeedback = require(script.Parent:WaitForChild("RunFeedback"))
 local gateTarget = round:WaitForChild("Gate")
 local eggTarget = round:WaitForChild("FirstEgg")
 local hatchTarget = round:WaitForChild("Hatch")
+local trainingTarget = round:WaitForChild("Training")
+local abilityTargets = {
+    vine = round:WaitForChild("Vine"),
+    relay = round:WaitForChild("Relay"),
+}
 local weeklyTargets = {}
 for _, point in ipairs(Rules.Weekly.order) do
     if not weeklyTargets[point] then
@@ -194,23 +199,27 @@ local function updateGuide()
 end
 
 local function update()
-    local egg = player:GetAttribute("EggName")
-    local carrying = egg ~= nil and egg ~= ""
-    local ability = Rules.Abilities[player:GetAttribute("EggAbility")]
+    local carrying = player:GetAttribute("CarryingEgg") == true
+    local abilityId = player:GetAttribute("EggAbility")
+    local ability = Rules.Abilities[abilityId]
     local tier = player:GetAttribute("SpeedTier") or 1
     stats.Text = string.format("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
-    objective.Text = if carrying and ability then "В инкубатор  ·  " .. ability.name .. ": " .. ability.hint
-        elseif carrying then "Донеси яйцо до инкубатора"
+    objective.Text = if carrying and ability then ability.hint
+        elseif carrying then "К инкубатору"
         elseif player:GetAttribute("Delivered") then "Яйцо спасено"
-        else ""
+        else round:GetAttribute("PrizeStatus") or ""
     local step = player:GetAttribute("OnboardingStep")
     local target
-    if (step == 1 or step == 2) and not player:GetAttribute("Delivered") then
-        if carrying then
-            target = hatchTarget.Value
-        elseif runOpen then
+    if carrying then
+        local shortcut = abilityTargets[abilityId]
+        target = if shortcut then shortcut.Value else hatchTarget.Value
+    elseif (step == 1 or step == 2) and not player:GetAttribute("Delivered") then
+        if runOpen then
             objective.Text = "Забери яйцо на Луговом острове"
             target = eggTarget.Value
+        elseif tier == 1 then
+            objective.Text = "Купи скорость за " .. Rules.UpgradeCosts[1] .. " монет"
+            target = trainingTarget.Value
         else
             objective.Text = "Дождись старта у ворот"
             target = gateTarget.Value
@@ -241,13 +250,14 @@ local function update()
     updateNotice()
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "EggName", "EggAbility", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do
     player:GetAttributeChangedSignal(name):Connect(updateNotice)
 end
-for _, target in ipairs({ gateTarget, eggTarget, hatchTarget }) do
+round:GetAttributeChangedSignal("PrizeStatus"):Connect(update)
+for _, target in ipairs({ gateTarget, eggTarget, hatchTarget, trainingTarget, abilityTargets.vine, abilityTargets.relay }) do
     target:GetPropertyChangedSignal("Value"):Connect(update)
 end
 for _, target in pairs(weeklyTargets) do
@@ -268,8 +278,7 @@ while true do
         local phase = if closing then "Ворота закроются" elseif open then "Забег" else "Подготовка"
         timer.Text = string.format("%s  ·  %02d сек", phase, left)
         timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
-        local egg = player:GetAttribute("EggName")
-        updateFeedback(open, left, egg ~= nil and egg ~= "", weeklyStart ~= nil)
+        updateFeedback(open, left, player:GetAttribute("CarryingEgg") == true, weeklyStart ~= nil)
     end
     local endsAt = player:GetAttribute("WeeklyEndsAt")
     if endsAt then

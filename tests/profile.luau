@@ -1,5 +1,6 @@
 local Profile = require("../src/server/Profile")
 local Rules = require("../src/shared/Rules")
+local Loot = require("../src/server/Loot")
 
 local catalog = {}
 for _, vault in ipairs(Rules.Vaults) do
@@ -22,7 +23,7 @@ assert(Profile.acquire(opened, "server_a", 101, catalog, Rules).lease.expiresAt 
 local pet = catalog.dew_moth
 local entry = {
     coins = 77, tier = 2, weeklyRewardWeek = 20, muteRunSounds = true, reduceCardMotion = true, ownedPets = { [pet.id] = pet }, pet = pet,
-    onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200, rankedSplits = { 2000, 4500, 6500, 9000, 12000, 15200 } }, delivered = true, egg = Rules.Vaults[1].eggs[1],
+    onboarding = 3, stormTrailUnlocked = true, deliveryRecords = { meadow = 8420 }, weeklyRecord = { week = 20, time = 14320, rankedTime = 15200, rankedSplits = { 2000, 4500, 6500, 9000, 12000, 15200 } }, delivered = true, egg = Loot.eggForRoll(1, 1),
 }
 local snapshot = Profile.snapshot(entry)
 assert(snapshot.coins == 77 and snapshot.tier == 2 and snapshot.equipped == pet.id and snapshot.onboarding == 3)

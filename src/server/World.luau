@@ -30,12 +30,12 @@ local function part(parent, name, size, position, color, collision)
     return prop
 end
 
-local function sign(anchor, text, eggDetails)
+local function sign(anchor, text)
     local plate = Instance.new("BillboardGui")
     plate.Name = "LocalSign"
-    plate.Size = if eggDetails then UDim2.fromOffset(178, 82) else UDim2.fromOffset(126, 36)
-    plate.StudsOffsetWorldSpace = Vector3.new(0, anchor.Size.Y / 2 + (if eggDetails then 2.4 else 1.5), 0)
-    plate.MaxDistance = if eggDetails then 36 else 30
+    plate.Size = UDim2.fromOffset(126, 30)
+    plate.StudsOffsetWorldSpace = Vector3.new(0, anchor.Size.Y / 2 + 1.5, 0)
+    plate.MaxDistance = 30
     plate.LightInfluence = 0
     plate.AlwaysOnTop = false
     plate.Parent = anchor
@@ -84,15 +84,15 @@ end
 
 local function runway(parent, fromX, toX, lane)
     local center = (fromX + toX) / 2
-    part(parent, "Мост", Vector3.new(toX - fromX, 1, 13), Vector3.new(center, -0.5, lane), Colors.wood, true)
-    for _, z in ipairs({ -6, 6 }) do
-        part(parent, "Бортик", Vector3.new(toX - fromX, 0.6, 0.5), Vector3.new(center, 0.3, lane + z), Colors.cream, false)
+    part(parent, "Мост", Vector3.new(toX - fromX, 1, 18), Vector3.new(center, -0.5, lane), Colors.wood, true)
+    for _, z in ipairs({ -8.75, 8.75 }) do
+        part(parent, "Бортик", Vector3.new(toX - fromX, 1.6, 0.5), Vector3.new(center, 0.8, lane + z), Colors.cream, true)
     end
 end
 
-local function buildWindTrail(parent, fromX, toX, anchorAbility)
-    local lane = 7
-    local width = 8
+local function buildWindTrail(parent, fromX, toX)
+    local lane = 9
+    local width = 14
     local trail = part(parent, "Ветровая тропа", Vector3.new(toX - fromX, 1, width),
         Vector3.new((fromX + toX) / 2, -0.5, lane), Colors.azure, true)
 
@@ -130,12 +130,6 @@ local function buildWindTrail(parent, fromX, toX, anchorAbility)
         bridge.CFrame = CFrame.lookAt(midpoint, b)
     end
 
-    local anchor = part(parent, "Стойка якоря", Vector3.new(1.5, 2, 1.5), Vector3.new(toX + 3, 1, lane - 3),
-        Colors.amber, false)
-    sign(anchor, anchorAbility.name)
-    local anchorPrompt = prompt(anchor, "Активировать")
-    anchorPrompt.MaxActivationDistance = 7
-
     local lever = part(parent, "Рычаг ветра", Vector3.new(1.5, 2.4, 1.5),
         Vector3.new(fromX - 4, 1.2, lane - 4), Colors.lilac, false)
     local leverLabel = sign(lever, "Рычаг ветра")
@@ -143,7 +137,7 @@ local function buildWindTrail(parent, fromX, toX, anchorAbility)
     leverPrompt.MaxActivationDistance = 7
 
     return {
-        part = trail, signs = signs, arrows = arrows, anchorPrompt = anchorPrompt,
+        part = trail, signs = signs, arrows = arrows,
         leverLabel = leverLabel, leverPrompt = leverPrompt,
     }
 end
@@ -176,12 +170,10 @@ function World.showWind(trail, direction, used, overrideActive)
 end
 
 local function buildStormRelay(parent, originX, landingX)
-    local origin = part(parent, "Грозовой маяк", Vector3.new(2, 4, 2),
-        Vector3.new(originX, 2, 8), Colors.lilac, false)
+    local origin = part(parent, "Грозовой маяк", Vector3.new(8, 0.3, 8),
+        Vector3.new(originX, 0.16, 8), Colors.lilac, false)
     origin.Material = Enum.Material.Neon
-    sign(origin, "Грозовой маяк")
-    local launch = prompt(origin, "Перенестись")
-    launch.MaxActivationDistance = 7
+    sign(origin, "Разряд → Янтарный")
 
     local landing = part(parent, "Приёмный маяк", Vector3.new(7, 0.3, 7),
         Vector3.new(landingX, 0.16, 8), Colors.lilac, false)
@@ -194,7 +186,7 @@ local function buildStormRelay(parent, originX, landingX)
     pulse.CanQuery = false
     pulse.Transparency = 1
     return {
-        prompt = launch,
+        origin = origin,
         destination = CFrame.lookAt(destination, destination + Vector3.new(-1, 0, 0)),
         pulse = pulse,
         flashes = 0,
@@ -242,20 +234,10 @@ local function buildWeekly(parent)
     }
 end
 
-function World.variantColor(egg)
-    return Color3.fromRGB(table.unpack(egg.color))
-end
-
-function World.showEgg(display, egg, rules)
-    display.part.Color = World.variantColor(egg)
-    local definition = rules.Abilities[egg.ability]
-    local ability = if definition then definition.name .. " · " .. rules.abilityEffect(definition)
-        else "Без способности"
-    display.label.Text = egg.name
-        .. "\n" .. egg.rarity .. " · Скорость " .. display.tier
-        .. "\n" .. ability
-        .. "\nРедкий питомец " .. display.rareChance[egg.rarity] .. "%"
-    display.label.TextColor3 = if egg.rarity == "Редкое" then Colors.amber else Colors.cream
+function World.showPrize(prize, available)
+    prize.part.Transparency = if available then 0 else 1
+    prize.label.Parent.Enabled = available
+    prize.prompt.Enabled = available
 end
 
 function World.showVine(vine, active)
@@ -296,19 +278,21 @@ function World.build(rules)
         vegetation(scene, "Rock", 7, z * 1.5, Vector3.new(6, 3, 4), z)
     end
 
-    local hatch = part(scene, "Инкубатор", Vector3.new(8, 0.4, 8), Vector3.new(14, 0.2, 0), Colors.cream, true)
-    local shop = part(scene, "Тренировка", Vector3.new(7, 0.4, 7), Vector3.new(-6, 0.2, 11), Colors.azure, true)
+    local hatch = part(scene, "Инкубатор", Vector3.new(8, 0.4, 8), Vector3.new(rules.HatchX, 0.2, 0), Colors.cream, true)
+    local shop = part(scene, "Тренировка", Vector3.new(7, 0.4, 7), Vector3.new(0, 0.2, 10), Colors.azure, true)
     sign(hatch, "Инкубатор")
-    sign(shop, "Тренировка")
+    sign(shop, "Прокачка скорости")
 
-    runway(scene, 24, 50, -9)
-    local vine = part(scene, "Мост из лиан", Vector3.new(26, 0.8, 8), Vector3.new(37, -0.4, 8), Colors.grass, false)
+    local meadowEdge = rules.Vaults[1].x - 20
+    runway(scene, 24, meadowEdge, -7)
+    local vine = part(scene, "Мост из лиан", Vector3.new(meadowEdge - 24, 0.8, 14),
+        Vector3.new((meadowEdge + 24) / 2, -0.4, 10), Colors.grass, false)
     World.showVine(vine, false)
-    local sprout = part(scene, "Росток", Vector3.new(2, 1.5, 2), Vector3.new(52, 0.75, 8), Colors.grass, false)
-    sign(sprout, "Росток лианы")
-    local vinePrompt = prompt(sprout, "Вырастить мост")
-    vinePrompt.MaxActivationDistance = 8
-    local gate = part(scene, "Ворота", Vector3.new(1, 10, 32), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
+    local sprout = part(scene, "Росток", Vector3.new(5, 0.35, 5),
+        Vector3.new(meadowEdge + 2, 0.18, 10), Colors.grass, false)
+    sprout.Material = Enum.Material.Neon
+    sign(sprout, "Лиана → Лагерь")
+    local gate = part(scene, "Ворота", Vector3.new(1, 10, 42), Vector3.new(rules.GateX, 5, 0), Colors.lilac, true)
     gate.Material = Enum.Material.Neon
     gate.Transparency = 0.35
 
@@ -319,14 +303,14 @@ function World.build(rules)
     for index, vault in ipairs(rules.Vaults) do
         local accent = World.VaultColors[index]
         if index == 2 then
-            windTrail = buildWindTrail(scene, previousX + 12, vault.x - 12, rules.Abilities.anchor)
+            windTrail = buildWindTrail(scene, previousX + 19, vault.x - 19)
         elseif previousX then
-            runway(scene, previousX + 13, vault.x - 13, 0)
+            runway(scene, previousX + 19, vault.x - 19, 0)
             if index == 3 then
                 stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8)
             end
         end
-        island(scene, vault.x, 28, 30, Colors.grass:Lerp(accent, 0.6))
+        island(scene, vault.x, 40, 54, Colors.grass:Lerp(accent, 0.6))
         local treeName = if index == 1 then "RoundTree" else "Pine"
         for _, z in ipairs({ -11, 11 }) do
             vegetation(scene, treeName, vault.x + 8, z, Vector3.new(7, 11 + index, 7), z * index)
@@ -335,21 +319,32 @@ function World.build(rules)
         part(scene, "Пьедестал", Vector3.new(5, 1, 5), Vector3.new(vault.x, 0.5, 0), Colors.plum, false)
         local egg = part(scene, "Яйцо", Vector3.new(2.4, 3.2, 2.4), Vector3.new(vault.x, 2.6, 0), accent, false)
         egg.Shape = Enum.PartType.Ball
-        local eggLabel = sign(egg, vault.name, true)
+        sign(egg, "Яйцо · " .. vault.name)
         vaultDisplays[index] = {
             part = egg,
-            label = eggLabel,
             prompt = prompt(egg, "Забрать яйцо"),
-            tier = vault.tier,
-            rareChance = rules.RarePetChance,
         }
         previousX = vault.x
     end
 
+    local prizeX = rules.Vaults[rules.Prize.vaultIndex].x + 5
+    local pedestal = part(scene, "Призовой пьедестал", Vector3.new(6, 1, 6),
+        Vector3.new(prizeX, 0.5, -18), Colors.amber, false)
+    pedestal.Material = Enum.Material.Neon
+    local prize = part(scene, "Призовое яйцо", Vector3.new(2.4, 3.2, 2.4),
+        Vector3.new(prizeX, 2.6, -18), Colors.cream, false)
+    prize.Shape = Enum.PartType.Ball
+    local prizeDisplay = {
+        part = prize,
+        label = sign(prize, "Призовое яйцо\n+" .. rules.Prize.bonus .. " монет"),
+        prompt = prompt(prize, "Забрать призовое яйцо"),
+    }
+    World.showPrize(prizeDisplay, false)
+
     local random = Random.new(73)
     for i = 1, 30 do
         local cloud = part(scene, "Облако", Vector3.new(20, 5, 10),
-            Vector3.new(random:NextNumber(-45, 285), random:NextNumber(-27, -10), random:NextNumber(31, 61) * (if i % 2 == 0 then 1 else -1)),
+            Vector3.new(random:NextNumber(-45, 350), random:NextNumber(-27, -10), random:NextNumber(31, 61) * (if i % 2 == 0 then 1 else -1)),
             Color3.fromRGB(239, 247, 255), false)
         cloud.Shape = Enum.PartType.Ball
     end
@@ -361,9 +356,10 @@ function World.build(rules)
         windTrail = windTrail,
         stormRelay = stormRelay,
         vine = vine,
-        vinePrompt = vinePrompt,
-        hatch = prompt(hatch, "Вылупить"),
-        shop = prompt(shop, "Тренироваться"),
+        sprout = sprout,
+        prize = prizeDisplay,
+        hatch = hatch,
+        shop = prompt(shop, "Купить скорость"),
         vaults = vaultDisplays,
     }
 end

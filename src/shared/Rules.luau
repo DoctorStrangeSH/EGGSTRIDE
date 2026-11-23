@@ -1,7 +1,7 @@
 local Rules = {}
 
-Rules.PrepareSeconds = 9
-Rules.RunSeconds = 25
+Rules.PrepareSeconds = 7
+Rules.RunSeconds = 55
 Rules.Weekly = {
     rewardCoins = 75, rewardTime = 20000,
     countdown = 3, duration = 35, tier = 2, checkpointRadius = 6, eggStep = 3,
@@ -11,49 +11,38 @@ Rules.Weekly = {
 }
 Rules.CarryMultiplier = 0.75
 Rules.StartCoins = 15
-Rules.GateX = 28
+Rules.GateX = 29
+Rules.HatchX = 14
+Rules.Prize = { vaultIndex = 2, bonus = 35 }
 Rules.Abilities = {
-    vine = { name = "Лиана", duration = 6, effect = "Мост на %d сек.", hint = "Используй у ростка" },
-    relay = { name = "Грозовой разряд", effect = "Переносит на Янтарный остров", hint = "Используй у маяка" },
-    anchor = { name = "Якорь ветра", duration = 6, effect = "Убирает встречный ветер на %d сек.", hint = "Используй у стойки тропы" },
+    vine = { name = "Лиана", duration = 11, hint = "Через зелёный росток" },
+    relay = { name = "Разряд", hint = "Через фиолетовый маяк" },
+    anchor = { name = "Якорь", hint = "Через синюю тропу" },
 }
 Rules.WindTailwind = 1.30
 Rules.WindHeadwind = 0.70
 Rules.WindSwitch = { duration = 6, partnerRadius = 14 }
 Rules.StormTrial = { name = "Грозовой след", secondsLeft = 5 }
-Rules.RarePetChance = { ["Обычное"] = 15, ["Редкое"] = 35 }
 Rules.Vaults = {
     {
-        id = "meadow", name = "Луговой", x = 63, tier = 1, coins = 32,
+        id = "meadow", name = "Луговой", x = 76, coins = 32,
         pets = {
             common = { id = "leaf_tail", name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
             rare = { id = "dew_moth", name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
         },
-        eggs = {
-            { id = "leaf_shell", name = "Листовое яйцо", rarity = "Обычное", weight = 80, ability = "vine", color = { 176, 220, 111 } },
-            { id = "dew_shell", name = "Яйцо росы", rarity = "Редкое", weight = 20, ability = "vine", color = { 113, 232, 235 } },
-        },
     },
     {
-        id = "amber", name = "Янтарный", x = 143, tier = 2, coins = 54,
+        id = "amber", name = "Янтарный", x = 180, coins = 54,
         pets = {
             common = { id = "amber_crab", name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
             rare = { id = "prism_fox", name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
         },
-        eggs = {
-            { id = "amber_shell", name = "Янтарное яйцо", rarity = "Обычное", weight = 85, ability = "anchor", color = { 255, 178, 76 } },
-            { id = "prism_shell", name = "Призматическое яйцо", rarity = "Редкое", weight = 15, ability = "anchor", color = { 255, 113, 165 } },
-        },
     },
     {
-        id = "storm", name = "Грозовой", x = 252, tier = 4, coins = 95,
+        id = "storm", name = "Грозовой", x = 320, coins = 95,
         pets = {
             common = { id = "thunder_puff", name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
             rare = { id = "lightning_kite", name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
-        },
-        eggs = {
-            { id = "thunder_shell", name = "Грозовое яйцо", rarity = "Обычное", weight = 90, ability = "relay", color = { 182, 150, 255 } },
-            { id = "lightning_shell", name = "Яйцо молнии", rarity = "Редкое", weight = 10, ability = "relay", color = { 255, 237, 108 } },
         },
     },
 }
@@ -72,22 +61,8 @@ function Rules.speed(tier, carrying)
     return Rules.Speeds[tier] * (if carrying then Rules.CarryMultiplier else 1)
 end
 
-function Rules.canCollect(tier, vault, carrying, open, delivered)
-    return open and not carrying and not delivered and tier >= vault.tier
-end
-
-function Rules.eggForRoll(vault, roll)
-    for _, egg in ipairs(vault.eggs) do
-        roll -= egg.weight
-        if roll <= 0 then
-            return egg
-        end
-    end
-    error("Egg roll exceeds the biome pool")
-end
-
-function Rules.hatchForRoll(vault, egg, roll)
-    return if roll <= Rules.RarePetChance[egg.rarity] then vault.pets.rare else vault.pets.common
+function Rules.canCollect(carrying, open, delivered)
+    return open and not carrying and not delivered
 end
 
 function Rules.improvedDelivery(previous, elapsed, limit)
@@ -147,10 +122,6 @@ end
 function Rules.stormTrialComplete(egg, usedAbility, secondsLeft)
     return egg ~= nil and egg.ability == "relay" and usedAbility == true
         and secondsLeft >= Rules.StormTrial.secondsLeft
-end
-
-function Rules.abilityEffect(ability)
-    return if ability.duration then string.format(ability.effect, ability.duration) else ability.effect
 end
 
 function Rules.windDirection(cycle)

@@ -5,6 +5,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
 local World = require(script.Parent.World)
+local Loot = require(script.Parent.Loot)
+local RoundPrize = require(script.Parent.RoundPrize)
 local Profile = require(script.Parent.Profile)
 local ProfileStore = require(script.Parent.ProfileStore)
 local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
@@ -27,7 +29,10 @@ local startedAt = workspace:GetServerTimeNow()
 local round = Instance.new("Folder")
 round.Name = "Round"
 round:SetAttribute("StartedAt", startedAt)
-local targets = { Gate = map.gate, FirstEgg = map.vaults[1].part, Hatch = map.hatch.Parent }
+local targets = {
+    Gate = map.gate, FirstEgg = map.vaults[1].part, Hatch = map.hatch, Training = map.shop.Parent,
+    Vine = map.sprout, Relay = map.stormRelay.origin,
+}
 for name, point in pairs(map.weekly.points) do
     targets["Weekly" .. name] = point
 end
@@ -64,6 +69,18 @@ local entries = {}
 local loading = {}
 local closing = false
 local pending = 0
+local prize = RoundPrize.new()
+
+local function showPrize(available, status)
+    World.showPrize(map.prize, available)
+    round:SetAttribute("PrizeStatus", status)
+end
+
+local function releasePrize(player)
+    if RoundPrize.release(prize, player) then
+        showPrize(true, "Призовое яйцо снова на Янтарном")
+    end
+end
 local logAnalytics = not RunService:IsStudio()
 local onboardingSteps = {
     "Joined with profile",
@@ -97,6 +114,7 @@ local function leave(player)
         return
     end
     entries[player] = nil
+    releasePrize(player)
     pending += 1
     local ok, reason = ProfileStore.save(entry.session, Profile.snapshot(entry), true)
     pending -= 1
@@ -131,7 +149,7 @@ local function publish(player, entry, message)
     player:SetAttribute("SpeedTier", entry.tier)
     player:SetAttribute("EquippedPetId", entry.pet and entry.pet.id or "")
     player:SetAttribute("EquippedPet", entry.pet and (entry.pet.name .. " · " .. entry.pet.rarity) or "")
-    player:SetAttribute("EggName", entry.egg and entry.egg.name or "")
+    player:SetAttribute("CarryingEgg", entry.egg ~= nil)
     player:SetAttribute("EggAbility", entry.egg and not entry.abilityUsed and entry.egg.ability or "")
     player:SetAttribute("Delivered", entry.delivered)
     if message then
@@ -190,11 +208,11 @@ local function showPet(root, pet, stormTrailUnlocked)
 end
 
 local function clearEgg(player, entry)
+    releasePrize(player)
     entry.egg = nil
     entry.eggVault = nil
     entry.pickupAt = nil
     entry.abilityUsed = false
-    entry.anchorEndsAt = nil
     entry.windFactor = nil
     entry.windPosition = nil
     entry.windSampleAt = nil
@@ -340,7 +358,7 @@ local function withNearbyPlayer(prompt, action)
         if closing or not entry or entry.weekly or ProfileStore.expired(entry.session) or not humanoid or humanoid.Health <= 0 or not root then
             return
         end
-        if (root.Position - prompt.Parent.Position).Magnitude > prompt.MaxActivationDistance then
+        if not prompt.Enabled or (root.Position - prompt.Parent.Position).Magnitude > prompt.MaxActivationDistance then
             return
         end
         action(player, entry, root)
@@ -351,6 +369,7 @@ local wasOpen = false
 local currentRound = -1
 local random = Random.new()
 local roundEggs = {}
+local prizeEgg
 local vineEndsAt = nil
 local windEnabled = workspace:GetAttribute("WindTrailEnabled") ~= false
 local windDirection = 0
@@ -361,39 +380,63 @@ local function showWind()
     World.showWind(map.windTrail, windDirection, switchedWind, windSwitchEndsAt ~= nil)
 end
 
+local function onBridge(root, bridge)
+    local delta = root.Position - bridge.Position
+    return math.abs(delta.X) <= bridge.Size.X / 2 and math.abs(delta.Z) <= bridge.Size.Z / 2
+        and delta.Y >= 0 and delta.Y <= 9
+end
+
 local function updateWind(player, entry, humanoid, root, now, open)
     local factor = 1
-    local protected = entry.anchorEndsAt ~= nil and now < entry.anchorEndsAt
-    if open and windDirection ~= 0 and root and humanoid and humanoid.Health > 0 then
-        local trail = map.windTrail.part
-        local offset = root.Position - trail.Position
-        if math.abs(offset.X) <= trail.Size.X / 2 - 2
-            and math.abs(offset.Z) <= trail.Size.Z / 2 and offset.Y >= 0 and offset.Y <= 9 then
-            if entry.windPosition then
-                local deltaTime = now - entry.windSampleAt
-                if deltaTime < 0.1 then
-                    return
-                end
-                factor = Rules.windFactor(windDirection, (root.Position.X - entry.windPosition) / deltaTime, protected)
+    local effect
+    if open and root and humanoid and humanoid.Health > 0 and not entry.weekly then
+        if onBridge(root, map.windTrail.part) then
+            local deltaTime = entry.windSampleAt and now - entry.windSampleAt
+            if deltaTime and deltaTime < 0.1 then
+                return
             end
-            entry.windPosition = root.Position.X
+            local paceX = if entry.windPosition then (root.Position.X - entry.windPosition) / deltaTime else 0
             entry.windSampleAt = now
+            entry.windPosition = root.Position.X
+            local anchor = entry.egg and entry.egg.ability == "anchor" and paceX < -1
+            factor = if anchor then Rules.WindTailwind else Rules.windFactor(windDirection, paceX)
+            effect = if anchor then "Якорь ускоряет бег" elseif factor > 1 then "Попутный ветер"
+                elseif factor < 1 then "Встречный ветер" else nil
         else
             entry.windPosition = nil
+            entry.windSampleAt = nil
+            if vineEndsAt and entry.egg and entry.egg.ability == "vine" and onBridge(root, map.vine) then
+                factor = Rules.WindTailwind
+                effect = "Лиана ускоряет бег"
+            end
         end
-    else
-        entry.windPosition = nil
     end
     if factor ~= (entry.windFactor or 1) then
         entry.windFactor = factor
         applySpeed(player, entry)
     end
-    local effect = if factor > 1 then "Попутный ветер"
-        elseif factor < 1 then "Встречный ветер"
-        elseif protected then "Якорь ветра активен"
-        else nil
     if player:GetAttribute("WindEffect") ~= effect then
         player:SetAttribute("WindEffect", effect)
+    end
+end
+
+local function updateAbility(player, entry, root, now)
+    if not entry.egg or entry.abilityUsed then
+        return
+    end
+    local ability = entry.egg.ability
+    if ability == "vine" and (root.Position - map.sprout.Position).Magnitude <= 7 then
+        entry.abilityUsed = true
+        vineEndsAt = now + Rules.Abilities.vine.duration
+        World.showVine(map.vine, true)
+        publish(player, entry, "Мост открыт. Беги по лиане.")
+    elseif ability == "relay" and (root.Position - map.stormRelay.origin.Position).Magnitude <= 7 then
+        entry.abilityUsed = true
+        player.Character:PivotTo(map.stormRelay.destination)
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        World.flashRelay(map.stormRelay)
+        publish(player, entry, "Маяк перенёс тебя на Янтарный остров.")
     end
 end
 
@@ -461,21 +504,59 @@ end
 
 local displayedWeek
 
+local function hatch(player, entry, root, secondsLeft, now)
+    local egg = entry.egg
+    local vault = entry.eggVault
+    local personalBest = Rules.improvedDelivery(entry.deliveryRecords[vault.id], now - entry.pickupAt)
+    if personalBest then
+        entry.deliveryRecords[vault.id] = personalBest
+        player:SetAttribute("DeliveryRecord_" .. vault.id, personalBest)
+    end
+    local unlockedTrail = not entry.stormTrailUnlocked and Rules.stormTrialComplete(egg, entry.abilityUsed, secondsLeft)
+    if unlockedTrail then
+        entry.stormTrailUnlocked = true
+    end
+    local bonus = 0
+    if RoundPrize.deliver(prize, player) then
+        bonus = Rules.Prize.bonus
+        showPrize(false, "Приз доставил " .. player.DisplayName)
+    end
+    clearEgg(player, entry)
+    entry.delivered = true
+    entry.coins += vault.coins + bonus
+    local pet = Loot.hatchForRoll(vault, egg, random:NextInteger(1, 100))
+    local isNew = entry.ownedPets[pet.id] == nil
+    if isNew then
+        entry.ownedPets[pet.id] = pet
+        player:SetAttribute("OwnsPet_" .. pet.id, true)
+    end
+    if not entry.pet or unlockedTrail then
+        entry.pet = entry.pet or pet
+        showPet(root, entry.pet, entry.stormTrailUnlocked)
+    end
+    advanceOnboarding(player, entry, 3)
+    publish(player, entry, "")
+    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins + bonus, isNew,
+        if unlockedTrail then Rules.StormTrial.name else nil, personalBest, bonus)
+end
+
 local function syncRound()
     local now = workspace:GetServerTimeNow()
     local elapsed = now - startedAt
     local cycle = math.floor(elapsed / (Rules.PrepareSeconds + Rules.RunSeconds))
     local open, secondsLeft = Rules.clock(elapsed)
-    if currentRound ~= cycle then
+    local newRound = currentRound ~= cycle
+    if newRound then
         currentRound = cycle
+        prize = RoundPrize.new()
+        prizeEgg = Loot.eggForRoll(Rules.Prize.vaultIndex, random:NextInteger(1, 100))
+        showPrize(false, "")
         windSwitchEndsAt = nil
         switchedWind = false
         windDirection = if windEnabled then Rules.windDirection(cycle) else 0
         showWind()
-        for index, vault in ipairs(Rules.Vaults) do
-            local egg = Rules.eggForRoll(vault, random:NextInteger(1, 100))
-            roundEggs[index] = egg
-            World.showEgg(map.vaults[index], egg, Rules)
+        for index in ipairs(Rules.Vaults) do
+            roundEggs[index] = Loot.eggForRoll(index, random:NextInteger(1, 100))
         end
         for player, entry in pairs(entries) do
             entry.delivered = false
@@ -487,8 +568,11 @@ local function syncRound()
             publish(player, entry, if lost then "" else nil)
         end
     end
-    if open ~= wasOpen then
+    if open ~= wasOpen or newRound then
         wasOpen = open
+        if open and not prize.owner and not prize.delivered then
+            showPrize(true, "Призовое яйцо на Янтарном")
+        end
         map.gate.CanCollide = not open
         map.gate.Transparency = if open then 1 else 0.35
     end
@@ -552,6 +636,14 @@ local function syncRound()
                 end
             end
         end
+        if open and not entry.weekly and entry.egg and humanoid and humanoid.Health > 0 and root
+            and not ProfileStore.expired(entry.session) then
+            if (root.Position - map.hatch.Position).Magnitude <= 8 then
+                hatch(player, entry, root, secondsLeft, now)
+            else
+                updateAbility(player, entry, root, now)
+            end
+        end
         updateWind(player, entry, humanoid, root, now, open)
         if not open and root and humanoid and humanoid.Health > 0 and root.Position.X > Rules.GateX then
             player.Character:PivotTo(map.spawn.CFrame + Vector3.new(0, 4, 0))
@@ -602,42 +694,35 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     publish(player, entry, "")
 end)
 
-for index, display in ipairs(map.vaults) do
-    local vault = Rules.Vaults[index]
-    withNearbyPlayer(display.prompt, function(player, entry, root)
-        local open, _, now = syncRound()
-        if not Rules.canCollect(entry.tier, vault, entry.egg ~= nil, open, entry.delivered) then
-            if open and entry.tier < vault.tier then
-                publish(player, entry, "Для этого яйца нужен уровень скорости " .. vault.tier .. ".")
-            end
+local function pickUp(player, entry, root, vaultIndex, isPrize)
+    local open, _, now = syncRound()
+    if not Rules.canCollect(entry.egg ~= nil, open, entry.delivered) then
+        return
+    end
+    if isPrize then
+        if not RoundPrize.claim(prize, player) then
             return
         end
-        local egg = roundEggs[index]
-        entry.egg = egg
-        entry.pickupAt = now
-        advanceOnboarding(player, entry, Rules.onboardingAfterPickup(entry.onboarding))
-        entry.eggVault = vault
-        entry.eggVisual = accessory(root, "EggstrideEgg", World.variantColor(egg),
-            Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
-        applySpeed(player, entry)
-        local ability = Rules.Abilities[egg.ability]
-        publish(player, entry, if ability then Rules.abilityEffect(ability)
-            else "Возвращайся в лагерь и подойди к инкубатору.")
+        showPrize(false, player.DisplayName .. " несёт призовое яйцо")
+    end
+    entry.egg = if isPrize then prizeEgg else roundEggs[vaultIndex]
+    entry.pickupAt = now
+    advanceOnboarding(player, entry, Rules.onboardingAfterPickup(entry.onboarding))
+    entry.eggVault = Rules.Vaults[vaultIndex]
+    entry.eggVisual = accessory(root, "EggstrideEgg", World.VaultColors[vaultIndex],
+        Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
+    applySpeed(player, entry)
+    publish(player, entry, "")
+end
+
+for index, display in ipairs(map.vaults) do
+    withNearbyPlayer(display.prompt, function(player, entry, root)
+        pickUp(player, entry, root, index, false)
     end)
 end
 
-withNearbyPlayer(map.vinePrompt, function(player, entry)
-    if not syncRound() or not entry.egg or entry.egg.ability ~= "vine" or entry.abilityUsed then
-        return
-    end
-    if vineEndsAt then
-        publish(player, entry, "Мост уже открыт. Можно бежать!")
-        return
-    end
-    entry.abilityUsed = true
-    vineEndsAt = workspace:GetServerTimeNow() + Rules.Abilities.vine.duration
-    World.showVine(map.vine, true)
-    publish(player, entry, "Мост из лиан открыт на " .. Rules.Abilities.vine.duration .. " сек.")
+withNearbyPlayer(map.prize.prompt, function(player, entry, root)
+    pickUp(player, entry, root, Rules.Prize.vaultIndex, true)
 end)
 
 withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
@@ -655,13 +740,13 @@ withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
 
     local trail = map.windTrail.part
     local amberEdge = trail.Position.X + trail.Size.X / 2
-    local anchor = map.windTrail.anchorPrompt.Parent.Position
+    local amberEntrance = Vector3.new(amberEdge, 0, trail.Position.Z)
     local carrier
     for other, otherEntry in pairs(entries) do
         if other ~= player and otherEntry.egg and not ProfileStore.expired(otherEntry.session) then
             local humanoid, root = characterParts(other)
             if humanoid and humanoid.Health > 0 and root and root.Position.X >= amberEdge
-                and (root.Position - anchor).Magnitude <= Rules.WindSwitch.partnerRadius then
+                and (root.Position - amberEntrance).Magnitude <= Rules.WindSwitch.partnerRadius then
                 carrier = other
                 break
             end
@@ -678,82 +763,6 @@ withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
     showWind()
     publish(player, entry, "Ты развернул ветер на " .. Rules.WindSwitch.duration .. " сек.")
     publish(carrier, entries[carrier], "Ветер развернули. Беги домой по короткой тропе!")
-end)
-
-withNearbyPlayer(map.windTrail.anchorPrompt, function(player, entry)
-    if not syncRound() then
-        return
-    end
-    if not entry.egg or entry.egg.ability ~= "anchor" then
-        publish(player, entry, "Нужно яйцо с Янтарного острова.")
-        return
-    end
-    if entry.abilityUsed then
-        publish(player, entry, "Якорь уже использован с этим яйцом.")
-        return
-    end
-    if windDirection ~= 1 then
-        publish(player, entry, "На пути домой нет встречного ветра.")
-        return
-    end
-    entry.abilityUsed = true
-    entry.anchorEndsAt = workspace:GetServerTimeNow() + Rules.Abilities.anchor.duration
-    publish(player, entry, "Якорь активен. Беги по короткой тропе.")
-end)
-
-withNearbyPlayer(map.stormRelay.prompt, function(player, entry, root)
-    if not syncRound() then
-        return
-    end
-    if not entry.egg or entry.egg.ability ~= "relay" then
-        publish(player, entry, "Нужно яйцо с Грозового острова.")
-        return
-    end
-    if entry.abilityUsed then
-        publish(player, entry, "Разряд уже использован с этим яйцом.")
-        return
-    end
-    entry.abilityUsed = true
-    player.Character:PivotTo(map.stormRelay.destination)
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
-    World.flashRelay(map.stormRelay)
-    publish(player, entry, "Ты на Янтарном острове. Донеси яйцо в лагерь.")
-end)
-
-withNearbyPlayer(map.hatch, function(player, entry, root)
-    local open, secondsLeft, now = syncRound()
-    if not open or not entry.egg then
-        return
-    end
-    local egg = entry.egg
-    local vault = entry.eggVault
-    local personalBest = Rules.improvedDelivery(entry.deliveryRecords[vault.id], now - entry.pickupAt)
-    if personalBest then
-        entry.deliveryRecords[vault.id] = personalBest
-        player:SetAttribute("DeliveryRecord_" .. vault.id, personalBest)
-    end
-    local unlockedTrail = not entry.stormTrailUnlocked and Rules.stormTrialComplete(egg, entry.abilityUsed, secondsLeft)
-    if unlockedTrail then
-        entry.stormTrailUnlocked = true
-    end
-    clearEgg(player, entry)
-    entry.delivered = true
-    entry.coins += vault.coins
-    local pet = Rules.hatchForRoll(vault, egg, random:NextInteger(1, 100))
-    local isNew = entry.ownedPets[pet.id] == nil
-    if isNew then
-        entry.ownedPets[pet.id] = pet
-        player:SetAttribute("OwnsPet_" .. pet.id, true)
-    end
-    if not entry.pet or unlockedTrail then
-        entry.pet = entry.pet or pet
-        showPet(root, entry.pet, entry.stormTrailUnlocked)
-    end
-    advanceOnboarding(player, entry, 3)
-    publish(player, entry, "")
-    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins, isNew,
-        if unlockedTrail then Rules.StormTrial.name else nil, personalBest)
 end)
 
 withNearbyPlayer(map.shop, function(player, entry)

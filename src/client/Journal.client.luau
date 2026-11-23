@@ -231,14 +231,7 @@ for _, vault in ipairs(Rules.Vaults) do
         name.TextWrapped = true
         name.TextXAlignment = Enum.TextXAlignment.Left
 
-        local commonEggOdds = Rules.RarePetChance["Обычное"]
-        local rareEggOdds = Rules.RarePetChance["Редкое"]
-        if pet == vault.pets.common then
-            commonEggOdds, rareEggOdds = 100 - commonEggOdds, 100 - rareEggOdds
-        end
-        local condition = string.format("%s\nИз обычного яйца %d%%, редкого %d%%",
-            pet.rarity, commonEggOdds, rareEggOdds)
-        local details = textItem("TextLabel", copy, condition, 12, palette.muted)
+        local details = textItem("TextLabel", copy, vault.name .. " остров", 12, palette.muted)
         details.LayoutOrder = 1
         details.Size = UDim2.new(1, 0, 0, 0)
         details.AutomaticSize = Enum.AutomaticSize.Y

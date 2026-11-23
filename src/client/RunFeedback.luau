@@ -113,9 +113,10 @@ function RunFeedback.connect(gui, event, rules, player)
 
     event.OnClientEvent:Connect(function(kind, ...)
         if kind == "Hatch" then
-            local petName, rarity, coins, isNew, rewardName, personalBest = ...
+            local petName, rarity, coins, isNew, rewardName, personalBest, bonus = ...
             local accent = if rarity == "Редкий" then Color3.fromRGB(255, 209, 117) else Color3.fromRGB(163, 255, 201)
-            local collection = if rewardName then "\nНаграда · " .. rewardName
+            local collection = if bonus and bonus > 0 then "\nПризовое яйцо · бонус " .. bonus
+                elseif rewardName then "\nНаграда · " .. rewardName
                 elseif personalBest then "\nЛичный рекорд · " .. rules.deliveryTimeText(personalBest)
                 else ""
             show(if isNew then petName .. " · новый вид" else petName, string.format("%s питомец · +%d монет%s", rarity, coins, collection), accent)
