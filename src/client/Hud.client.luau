@@ -15,6 +15,8 @@ local trainingTarget = round:WaitForChild("Training")
 local abilityTargets = {
     vine = round:WaitForChild("Vine"),
     relay = round:WaitForChild("Relay"),
+    windEntrance = round:WaitForChild("WindEntrance"),
+    windExit = round:WaitForChild("WindExit"),
 }
 local weeklyTargets = {}
 for _, point in ipairs(Rules.Weekly.order) do
@@ -103,7 +105,7 @@ guide.Enabled = false
 guide.Parent = workspace
 
 local waypoint = Instance.new("BillboardGui")
-waypoint.Name = "WeeklyWaypoint"
+waypoint.Name = "RouteWaypoint"
 waypoint.AlwaysOnTop = false
 waypoint.MaxDistance = 56
 waypoint.LightInfluence = 0
@@ -222,14 +224,15 @@ local function update()
     local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm_" .. locale.language)
         elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber_" .. locale.language)
         else round:GetAttribute("PrizeStatus_meadow_" .. locale.language) or text("Луговое яйцо доступно каждому")
-    objective.Text = if carrying and ability then text(ability.hint)
-        elseif carrying then text("К инкубатору")
-        elseif delivered then text("Яйцо спасено")
-        else prizeStatus or ""
+    objective.Text = if delivered then text("Яйцо спасено") else prizeStatus or ""
     local target
     if carrying then
-        local shortcut = abilityTargets[abilityId]
-        target = if shortcut then shortcut.Value else hatchTarget.Value
+        local anchorTarget = player:GetAttribute("AnchorReturnTarget") or "windEntrance"
+        local shortcut = abilityTargets[if abilityId == "anchor" then anchorTarget else abilityId]
+        target = shortcut and shortcut.Value or hatchTarget.Value
+        objective.Text = if abilityId == "anchor" and anchorTarget == "windExit" then text("По тропе к Луговому острову")
+            elseif ability and shortcut then text(ability.hint)
+            else text("К инкубатору")
     else
         local objectiveKey = Rules.onboardingObjective(player:GetAttribute("OnboardingStep"), runOpen, delivered, tier)
         if objectiveKey then
@@ -254,14 +257,18 @@ local function update()
         objective.Text = text("Пройди метки и верни яйцо")
         target = nil
     end
-    waypoint.Adornee = if weeklyPoint then target else nil
+    waypoint.Adornee = if weeklyPoint or (carrying and not weeklyStart) then target else nil
+    if waypoint.Adornee then
+        local height = if weeklyPoint then 2 else waypoint.Adornee.Size.Y / 2 + 3.25
+        waypoint.StudsOffsetWorldSpace = Vector3.new(0, height, 0)
+    end
     guide.Adornee = target
     objective.Visible = objective.Text ~= ""
     updateGuide()
     updateNotice()
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
+for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "AnchorReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do
@@ -270,8 +277,10 @@ end
 for _, definition in ipairs(Rules.Prizes) do
     round:GetAttributeChangedSignal("PrizeStatus_" .. definition.id .. "_" .. locale.language):Connect(update)
 end
-for _, target in ipairs({ gateTarget, eggTarget, hatchTarget, trainingTarget, abilityTargets.vine, abilityTargets.relay }) do
-    target:GetPropertyChangedSignal("Value"):Connect(update)
+for _, targets in ipairs({ { gateTarget, eggTarget, hatchTarget, trainingTarget }, abilityTargets }) do
+    for _, target in pairs(targets) do
+        target:GetPropertyChangedSignal("Value"):Connect(update)
+    end
 end
 for _, target in pairs(weeklyTargets) do
     target:GetPropertyChangedSignal("Value"):Connect(update)

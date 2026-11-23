@@ -307,6 +307,15 @@ function Rules.weeklyBest(record, week)
     return if record and record.week == week then record.time else nil
 end
 
+function Rules.anchorReturnTarget(x, meadowEdge, amberEdge, onTrail)
+    if x <= meadowEdge then
+        return "hatch"
+    elseif onTrail then
+        return "windExit"
+    end
+    return if x >= amberEdge then "windEntrance" else "hatch"
+end
+
 function Rules.returnBridgeStage(stage, relativeX)
     if stage == 0 and relativeX >= 0.25 then
         return 1

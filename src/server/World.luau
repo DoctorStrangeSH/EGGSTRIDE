@@ -120,8 +120,10 @@ local function buildWindTrail(parent, fromX, toX)
         table.insert(arrows, { origin = origin, wings = wings })
     end
     local signs = {}
+    local markers = {}
     for _, x in ipairs({ fromX, toX }) do
         local marker = part(parent, "Флюгер", Vector3.new(0.6, 3, 0.6), Vector3.new(x, 1.5, lane + 3.5), Colors.azure, false)
+        table.insert(markers, marker)
         table.insert(signs, sign(marker, "Ветровая тропа\nШтиль"))
         local bridgeMarker = part(parent, "Указатель моста", Vector3.new(0.6, 3, 0.6),
             Vector3.new(x, 1.5, -8), Colors.wood, false)
@@ -150,6 +152,7 @@ local function buildWindTrail(parent, fromX, toX)
 
     return {
         part = trail, signs = signs, arrows = arrows,
+        meadowMarker = markers[1], amberMarker = markers[2],
         leverLabel = leverLabel, leverPrompt = leverPrompt,
     }
 end

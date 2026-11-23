@@ -25,6 +25,7 @@ local english = {
     ["Через зелёный росток"] = "Take the green sprout shortcut",
     ["Через фиолетовый маяк"] = "Use the purple beacon",
     ["Через синюю тропу"] = "Take the blue wind trail",
+    ["По тропе к Луговому острову"] = "Follow the trail to Meadow Island",
     ["Добеги до метки 1"] = "Reach checkpoint 1",
     ["Добеги до метки 2"] = "Reach checkpoint 2",
     ["Забери тренировочное яйцо"] = "Grab the practice egg",

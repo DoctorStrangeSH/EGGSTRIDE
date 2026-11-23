@@ -81,6 +81,7 @@ round:SetAttribute("StartedAt", startedAt)
 local targets = {
     Gate = map.gate, FirstEgg = map.vaults[1].part, Hatch = map.hatch, Training = map.shop.Parent,
     Vine = map.sprout, Relay = map.stormRelay.origin,
+    WindEntrance = map.windTrail.amberMarker, WindExit = map.windTrail.meadowMarker,
 }
 for name, point in pairs(map.weekly.points) do
     targets["Weekly" .. name] = point
@@ -388,6 +389,7 @@ local function clearEgg(player, entry, outcome)
     entry.windFactor = nil
     entry.windPosition = nil
     entry.windSampleAt = nil
+    player:SetAttribute("AnchorReturnTarget", nil)
     player:SetAttribute("WindEffect", nil)
     if entry.eggVisual then
         entry.eggVisual:Destroy()
@@ -612,7 +614,16 @@ local function updateWind(player, entry, humanoid, root, now, open)
     local factor = 1
     local effect
     if open and root and humanoid and humanoid.Health > 0 and not entry.weekly then
-        if onBridge(root, map.windTrail.part) then
+        local trail = map.windTrail.part
+        local onTrail = onBridge(root, trail)
+        if entry.egg and entry.egg.ability == "anchor" then
+            local target = Rules.anchorReturnTarget(root.Position.X, map.windTrail.meadowMarker.Position.X,
+                map.windTrail.amberMarker.Position.X, onTrail)
+            if player:GetAttribute("AnchorReturnTarget") ~= target then
+                player:SetAttribute("AnchorReturnTarget", target)
+            end
+        end
+        if onTrail then
             local deltaTime = entry.windSampleAt and now - entry.windSampleAt
             if deltaTime and deltaTime < 0.1 then
                 return
@@ -622,7 +633,7 @@ local function updateWind(player, entry, humanoid, root, now, open)
             entry.windPosition = root.Position.X
             local anchor = entry.egg and entry.egg.ability == "anchor" and paceX < -1
             if anchor then
-                trackReturnBridge(entry, root, map.windTrail.part)
+                trackReturnBridge(entry, root, trail)
             end
             factor = if anchor then Rules.WindTailwind else Rules.windFactor(windDirection, paceX)
             effect = if anchor then "Якорь ускоряет бег" elseif factor > 1 then "Попутный ветер"
