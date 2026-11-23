@@ -155,6 +155,12 @@ function Profile.read(stored, catalog, rules)
             break
         end
     end
+    for _, theme in ipairs(rules.CampThemes) do
+        if stored.equippedCampTheme == theme.id then
+            record.equippedCampTheme = theme.id
+            break
+        end
+    end
     record.tier = stored.tier
     record.season = readSeason(stored.season, rules)
     record.deliveries = readCounts(stored.deliveries, rules.Vaults)
@@ -229,6 +235,7 @@ function Profile.snapshot(entry)
     record.tier = entry.tier
     record.equippedTrail = entry.equippedTrail
     record.equippedHatchEffect = entry.equippedHatchEffect
+    record.equippedCampTheme = entry.equippedCampTheme
     record.muteRunSounds = entry.muteRunSounds == true
     record.reduceCardMotion = entry.reduceCardMotion == true
     record.stormTrailUnlocked = entry.stormTrailUnlocked == true

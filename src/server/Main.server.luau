@@ -388,6 +388,9 @@ local cosmetics = table.clone(Rules.Trails)
 for _, effect in ipairs(Rules.HatchEffects) do
     table.insert(cosmetics, effect)
 end
+for _, theme in ipairs(Rules.CampThemes) do
+    table.insert(cosmetics, theme)
+end
 local cosmeticShop = CosmeticShop.start(cosmetics, Shared, MarketplaceService, inStudio, previewSeasonPass, seasonPassId, function(player)
     local entry = entries[player]
     if not closing and entry and not ProfileStore.expired(entry.session) then
@@ -441,6 +444,7 @@ local function join(player)
         tier = record.tier,
         equippedTrail = record.equippedTrail,
         equippedHatchEffect = record.equippedHatchEffect,
+        equippedCampTheme = record.equippedCampTheme,
         pet = petCatalog[record.equipped],
         delivered = false,
         ownedPets = {},

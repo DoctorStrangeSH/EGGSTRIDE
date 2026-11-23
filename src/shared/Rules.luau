@@ -11,6 +11,22 @@ Rules.HatchEffects = {
     { slot = "hatch", id = "prism", name = "Мозаика света", first = { 163, 255, 213 }, last = { 255, 213, 120 }, pattern = "prism" },
 }
 
+Rules.CampPalette = { first = { 65, 83, 97 }, last = { 220, 173, 111 }, glow = { 255, 227, 170 } }
+Rules.CampThemes = {
+    {
+        slot = "camp", id = "sunrise", name = "Рассветный лагерь", description = "Терракотовые флаги и золотые фонари",
+        first = { 128, 57, 64 }, last = { 238, 137, 80 }, glow = { 255, 203, 111 },
+    },
+    {
+        slot = "camp", id = "lagoon", name = "Лагуна", description = "Морские оттенки и мятные фонари",
+        first = { 36, 74, 102 }, last = { 76, 178, 188 }, glow = { 130, 251, 199 },
+    },
+    {
+        slot = "camp", id = "twilight", name = "Звёздные сумерки", description = "Сиреневые флаги и холодный свет",
+        first = { 58, 49, 104 }, last = { 188, 139, 234 }, glow = { 160, 215, 255 },
+    },
+}
+
 Rules.PrepareSeconds = 7
 Rules.RunSeconds = 55
 Rules.Weekly = {

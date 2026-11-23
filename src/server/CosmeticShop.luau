@@ -1,8 +1,8 @@
 local CosmeticShop = {}
 
-local fields = { trail = "equippedTrail", hatch = "equippedHatchEffect" }
-local attributes = { trail = "EquippedTrail", hatch = "EquippedHatchEffect" }
-local passPrefixes = { trail = "TrailPass_", hatch = "HatchPass_" }
+local fields = { trail = "equippedTrail", hatch = "equippedHatchEffect", camp = "equippedCampTheme" }
+local attributes = { trail = "EquippedTrail", hatch = "EquippedHatchEffect", camp = "EquippedCampTheme" }
+local passPrefixes = { trail = "TrailPass_", hatch = "HatchPass_", camp = "CampPass_" }
 
 function CosmeticShop.select(entry, item, owned, clear)
     if not clear and not owned then

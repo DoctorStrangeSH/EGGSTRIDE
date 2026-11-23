@@ -1,3 +1,4 @@
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local ServerStorage = game:GetService("ServerStorage")
 
@@ -249,6 +250,41 @@ function World.showVine(vine, active)
     vine.Transparency = if active then 0 else 1
 end
 
+local function buildCampDecor(scene, palette)
+    local decor = Instance.new("Folder")
+    decor.Name = "CampDecor"
+    decor.Parent = scene
+
+    local function prop(name, role, size, position)
+        local piece = part(decor, name, size, position, Color3.fromRGB(table.unpack(palette[role])), false)
+        piece.CanQuery = false
+        CollectionService:AddTag(piece, "EggstrideCamp_" .. role)
+        return piece
+    end
+
+    for _, z in ipairs({ -15, 15 }) do
+        for _, x in ipairs({ -10, 10 }) do
+            prop("Основание фонаря", "last", Vector3.new(2, 0.25, 2), Vector3.new(x, 0.13, z))
+            prop("Столб фонаря", "first", Vector3.new(0.32, 4.4, 0.32), Vector3.new(x, 2.2, z))
+            local lantern = prop("Светильник", "glow", Vector3.new(0.84, 1.28, 0.84), Vector3.new(x, 4.7, z))
+            lantern.Material = Enum.Material.Neon
+            prop("Крыша фонаря", "first", Vector3.new(1.16, 0.22, 1.16), Vector3.new(x, 5.42, z))
+        end
+    end
+
+    for _, z in ipairs({ -6.6, 6.6 }) do
+        local x = 20
+        prop("Стойка флага", "first", Vector3.new(0.28, 6.6, 0.28), Vector3.new(x, 3.3, z))
+        prop("Перекладина", "first", Vector3.new(0.32, 0.28, 2.9), Vector3.new(x, 6.35, z))
+        prop("Флаг лагеря", "last", Vector3.new(0.12, 2.65, 2.4), Vector3.new(x, 4.92, z))
+        prop("Полоса флага", "glow", Vector3.new(0.14, 0.20, 2.42), Vector3.new(x, 3.72, z))
+    end
+
+    for _, z in ipairs({ -3.1, 3.1 }) do
+        prop("Край дорожки", "last", Vector3.new(17, 0.07, 0.18), Vector3.new(4.5, 0.037, z))
+    end
+end
+
 function World.build(rules)
     Lighting.ClockTime = 14
     Lighting.Brightness = 2.4
@@ -265,6 +301,7 @@ function World.build(rules)
     atmosphere.Parent = Lighting
 
     island(scene, 0, 50, 52, Colors.grass)
+    buildCampDecor(scene, rules.CampPalette)
     local spawn = Instance.new("SpawnLocation")
     spawn.Name = "Camp"
     spawn.Position = Vector3.new(0, 0.1, 0)

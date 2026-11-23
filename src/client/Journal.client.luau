@@ -11,6 +11,7 @@ local claimSeason = shared:WaitForChild("ClaimSeasonReward")
 local seasonPass = shared:WaitForChild("SeasonPass")
 local cosmeticShop = shared:WaitForChild("CosmeticShop")
 local HatchEffects = require(script.Parent.HatchEffects)
+local CampThemes = require(script.Parent.CampThemes)
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
@@ -183,23 +184,34 @@ local function menuButton(caption, order)
     return button
 end
 
+local previewCamp = CampThemes.connect(player, Rules)
+
+local function nearCamp()
+    local scene = workspace:FindFirstChild("EggstrideWorld")
+    local camp = scene and scene:FindFirstChild("Camp")
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    return camp and root and player:GetAttribute("WeeklyStartsAt") == nil and (root.Position - camp.Position).Magnitude <= 30
+end
+
 local function addCosmetics(caption, firstOrder, items, equippedAttribute)
     local shopButton = menuButton(caption .. "  +", firstOrder)
     local shopExpanded = false
     local shopCards = {}
     for index, item in ipairs(items) do
         local isTrail = item.slot == "trail"
+        local isCamp = item.slot == "camp"
         local order = shopButton.LayoutOrder + 1 + (index - 1) * 3
         local heading = description("CosmeticName_" .. item.id, order, palette.text)
-        heading.Text = item.name
+        heading.Text = if isCamp then item.name .. "\n" .. item.description else item.name
 
         local swatch = Instance.new("Frame")
         swatch.LayoutOrder = order + 1
-        swatch.Size = UDim2.new(1, -8, 0, if isTrail then 8 else 40)
-        swatch.BackgroundColor3 = if isTrail then Color3.new(1, 1, 1) else palette.row
+        swatch.Size = UDim2.new(1, -8, 0, if isCamp then 12 elseif isTrail then 8 else 40)
+        swatch.BackgroundColor3 = if isTrail or isCamp then Color3.new(1, 1, 1) else palette.row
         swatch.Parent = list
         Instance.new("UICorner", swatch).CornerRadius = UDim.new(0, 8)
-        if isTrail then
+        if isTrail or isCamp then
             local gradient = Instance.new("UIGradient")
             gradient.Color = ColorSequence.new(Color3.fromRGB(table.unpack(item.first)), Color3.fromRGB(table.unpack(item.last)))
             gradient.Parent = swatch
@@ -211,13 +223,24 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
         buttons.Size = UDim2.new(1, -8, 0, 44)
         buttons.Parent = list
 
-        local try = textItem("TextButton", buttons, if isTrail then "Примерить · 12 с" else "Посмотреть", 13, palette.panel)
+        local try = textItem("TextButton", buttons, if isTrail or isCamp then "Примерить · 12 с" else "Посмотреть", 13, palette.panel)
         try.Size = UDim2.new(0.44, -3, 1, 0)
         try.TextWrapped = true
         fill(try, palette.mint, 10)
         try.Activated:Connect(function()
             if isTrail then
                 cosmeticShop:FireServer("try", item.id)
+                scrim.Visible = false
+                updateLauncher()
+            elseif isCamp then
+                if not nearCamp() then
+                    try.Text = "Вернись в лагерь"
+                    task.delay(1.5, function()
+                        try.Text = "Примерить · 12 с"
+                    end)
+                    return
+                end
+                previewCamp(item)
                 scrim.Visible = false
                 updateLauncher()
             else
@@ -259,7 +282,7 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
             end
             local livePurchase = status == "locked" and productChecked and not offsale
             local enabled = status == "preview" or status == "owned" or status == "error" or livePurchase
-            action.Text = if status == "owned" then (if selected then "Снять" elseif isTrail then "Надеть" else "Выбрать")
+            action.Text = if status == "owned" then (if selected then "Снять" elseif isTrail then "Надеть" elseif isCamp then "Применить" else "Выбрать")
                 elseif status == "preview" then "Тестовая покупка"
                 elseif status == "locked" and offsale then "Вне продажи"
                 elseif livePurchase then (if price then "Купить · " .. price .. " R$" else "Купить за Robux")
@@ -300,6 +323,7 @@ local function addCosmetics(caption, firstOrder, items, equippedAttribute)
     end)
 end
 
+addCosmetics("Оформление лагеря", -70, Rules.CampThemes, "EquippedCampTheme")
 addCosmetics("Магазин следов", -60, Rules.Trails, "EquippedTrail")
 addCosmetics("Эффекты вылупления", -50, Rules.HatchEffects, "EquippedHatchEffect")
 
