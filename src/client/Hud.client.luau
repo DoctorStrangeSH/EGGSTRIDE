@@ -204,10 +204,13 @@ local function update()
     local ability = Rules.Abilities[abilityId]
     local tier = player:GetAttribute("SpeedTier") or 1
     stats.Text = string.format("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
+    local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm")
+        elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber")
+        else "Луговое яйцо доступно каждому"
     objective.Text = if carrying and ability then ability.hint
         elseif carrying then "К инкубатору"
         elseif player:GetAttribute("Delivered") then "Яйцо спасено"
-        else round:GetAttribute("PrizeStatus") or ""
+        else prizeStatus or ""
     local step = player:GetAttribute("OnboardingStep")
     local target
     if carrying then
@@ -256,7 +259,9 @@ end
 for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do
     player:GetAttributeChangedSignal(name):Connect(updateNotice)
 end
-round:GetAttributeChangedSignal("PrizeStatus"):Connect(update)
+for _, definition in ipairs(Rules.Prizes) do
+    round:GetAttributeChangedSignal("PrizeStatus_" .. definition.id):Connect(update)
+end
 for _, target in ipairs({ gateTarget, eggTarget, hatchTarget, trainingTarget, abilityTargets.vine, abilityTargets.relay }) do
     target:GetPropertyChangedSignal("Value"):Connect(update)
 end

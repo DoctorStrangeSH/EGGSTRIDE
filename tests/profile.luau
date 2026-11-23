@@ -9,6 +9,10 @@ for _, vault in ipairs(Rules.Vaults) do
     end
 end
 
+for _, pet in ipairs(Rules.RelicPets) do
+    catalog[pet.id] = pet
+end
+
 local defaults = Profile.new(Rules.StartCoins)
 assert(defaults.tier == 1 and defaults.coins == Rules.StartCoins and not next(defaults.owned) and defaults.onboarding == 0 and not defaults.stormTrailUnlocked)
 
@@ -85,3 +89,9 @@ assert(invalid == nil and invalidReason == "invalid")
 assert(Profile.acquire({version = 1, coins = -1, tier = 1, owned = {}}, "server_c", 400, catalog, Rules) == nil)
 
 print("Eggstride profiles: OK")
+
+local relic = Rules.RelicPets[10]
+entry.ownedPets[relic.id] = relic
+entry.pet = relic
+local relicProfile = Profile.read(Profile.snapshot(entry), catalog, Rules)
+assert(relicProfile.equipped == relic.id and relicProfile.owned[relic.id])

@@ -197,60 +197,82 @@ local rows = {}
 local recordLabels = {}
 local order = 3
 
+local function addPetRow(pet, source, exclusive)
+    local row = Instance.new("Frame")
+    row.Name = pet.id
+    order += 1
+    row.LayoutOrder = order
+    row.Size = UDim2.new(1, -8, 0, 0)
+    row.AutomaticSize = Enum.AutomaticSize.Y
+    row.Parent = list
+    fill(row, palette.row, 10)
+
+    local copy = Instance.new("Frame")
+    copy.BackgroundTransparency = 1
+    copy.Size = UDim2.new(1, -104, 0, 0)
+    copy.AutomaticSize = Enum.AutomaticSize.Y
+    copy.Parent = row
+    local copyPadding = Instance.new("UIPadding", copy)
+    copyPadding.PaddingLeft = UDim.new(0, 10)
+    copyPadding.PaddingTop = UDim.new(0, 8)
+    copyPadding.PaddingBottom = UDim.new(0, 8)
+    local copyLayout = Instance.new("UIListLayout", copy)
+    copyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    copyLayout.Padding = UDim.new(0, 2)
+
+    local name = textItem("TextLabel", copy, pet.name, 14, palette.text)
+    name.Size = UDim2.new(1, 0, 0, 0)
+    name.AutomaticSize = Enum.AutomaticSize.Y
+    name.TextWrapped = true
+    name.TextXAlignment = Enum.TextXAlignment.Left
+
+    local details = textItem("TextLabel", copy, source, 12, palette.muted)
+    details.LayoutOrder = 1
+    details.Size = UDim2.new(1, 0, 0, 0)
+    details.AutomaticSize = Enum.AutomaticSize.Y
+    details.TextXAlignment = Enum.TextXAlignment.Left
+    details.TextWrapped = true
+
+    local action = textItem("TextButton", row, "", 12, palette.panel)
+    action.AnchorPoint = Vector2.new(1, 0)
+    action.Position = UDim2.new(1, -8, 0, 8)
+    action.Size = UDim2.fromOffset(86, 44)
+    fill(action, palette.muted, 9)
+    action.Activated:Connect(function()
+        if player:GetAttribute("OwnsPet_" .. pet.id) and player:GetAttribute("EquippedPetId") ~= pet.id then
+            equipPet:FireServer(pet.id)
+        end
+    end)
+    table.insert(rows, { id = pet.id, frame = row, action = action, name = name, pet = pet, exclusive = exclusive })
+end
+
 for _, vault in ipairs(Rules.Vaults) do
     order += 1
     local record = description("DeliveryRecord_" .. vault.id, order, palette.gold)
     record.BackgroundTransparency = 1
     recordLabels[vault] = record
     for _, pet in ipairs({ vault.pets.common, vault.pets.rare }) do
-        local row = Instance.new("Frame")
-        row.Name = pet.id
-        order += 1
-        row.LayoutOrder = order
-        row.Size = UDim2.new(1, -8, 0, 0)
-        row.AutomaticSize = Enum.AutomaticSize.Y
-        row.Parent = list
-        fill(row, palette.row, 10)
-
-        local copy = Instance.new("Frame")
-        copy.BackgroundTransparency = 1
-        copy.Size = UDim2.new(1, -104, 0, 0)
-        copy.AutomaticSize = Enum.AutomaticSize.Y
-        copy.Parent = row
-        local copyPadding = Instance.new("UIPadding", copy)
-        copyPadding.PaddingLeft = UDim.new(0, 10)
-        copyPadding.PaddingTop = UDim.new(0, 8)
-        copyPadding.PaddingBottom = UDim.new(0, 8)
-        local copyLayout = Instance.new("UIListLayout", copy)
-        copyLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        copyLayout.Padding = UDim.new(0, 2)
-
-        local name = textItem("TextLabel", copy, pet.name, 14, palette.text)
-        name.Size = UDim2.new(1, 0, 0, 0)
-        name.AutomaticSize = Enum.AutomaticSize.Y
-        name.TextWrapped = true
-        name.TextXAlignment = Enum.TextXAlignment.Left
-
-        local details = textItem("TextLabel", copy, vault.name .. " остров", 12, palette.muted)
-        details.LayoutOrder = 1
-        details.Size = UDim2.new(1, 0, 0, 0)
-        details.AutomaticSize = Enum.AutomaticSize.Y
-        details.TextXAlignment = Enum.TextXAlignment.Left
-        details.TextWrapped = true
-
-        local action = textItem("TextButton", row, "", 12, palette.panel)
-        action.AnchorPoint = Vector2.new(1, 0)
-        action.Position = UDim2.new(1, -8, 0, 8)
-        action.Size = UDim2.fromOffset(86, 44)
-        fill(action, palette.muted, 9)
-        action.Activated:Connect(function()
-            if player:GetAttribute("OwnsPet_" .. pet.id) and player:GetAttribute("EquippedPetId") ~= pet.id then
-                equipPet:FireServer(pet.id)
-            end
-        end)
-        table.insert(rows, { id = pet.id, action = action })
+        addPetRow(pet, vault.name .. " остров", false)
     end
 end
+
+order += 1
+local relicCollection = textItem("TextButton", list, "", 14, palette.panel)
+relicCollection.LayoutOrder = order
+relicCollection.Size = UDim2.new(1, -8, 0, 44)
+fill(relicCollection, palette.gold, 10)
+for _, pet in ipairs(Rules.RelicPets) do
+    addPetRow(pet, "Грозовая реликвия", true)
+end
+local relicExpanded = false
+local function toggleRelicRows()
+    for _, row in ipairs(rows) do
+        if row.exclusive then
+            row.frame.Visible = relicExpanded
+        end
+    end
+end
+toggleRelicRows()
 
 local function update()
     local equipped = player:GetAttribute("EquippedPetId")
@@ -272,11 +294,18 @@ local function update()
         label.Text = vault.name .. (if time then " · Рекорд " .. Rules.deliveryTimeText(time) else " · Пока без рекорда")
     end
     local count = 0
+    local relicCount = 0
     for _, row in ipairs(rows) do
         local owned = player:GetAttribute("OwnsPet_" .. row.id) == true
         local selected = owned and equipped == row.id
         if owned then
             count += 1
+            if row.exclusive then
+                relicCount += 1
+            end
+        end
+        if row.exclusive then
+            row.name.Text = if owned then row.pet.name .. " · " .. row.pet.rarity else "Неизвестный питомец"
         end
         row.action.Text = if selected then "Спутник" elseif owned then "Выбрать" else "Не открыт"
         row.action.BackgroundColor3 = if selected then palette.mint elseif owned then palette.gold else palette.muted
@@ -284,9 +313,16 @@ local function update()
         row.action.Selectable = owned and not selected
         row.action.AutoButtonColor = owned and not selected
     end
+    relicCollection.Text = string.format("Грозовая коллекция %d/%d  %s", relicCount, #Rules.RelicPets, if relicExpanded then "−" else "+")
     open.Text = string.format("Питомцы %d/%d", count, #rows)
     title.Text = string.format("Коллекция %d/%d", count, #rows)
 end
+
+relicCollection.Activated:Connect(function()
+    relicExpanded = not relicExpanded
+    toggleRelicRows()
+    update()
+end)
 
 player:GetAttributeChangedSignal("EquippedPetId"):Connect(update)
 player:GetAttributeChangedSignal("WeeklyBest"):Connect(update)

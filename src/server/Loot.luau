@@ -1,5 +1,18 @@
 local Loot = {}
 
+-- Indexes match the public collection. Weights are server-side and sum to 1000.
+local relicWeights = { 66, 66, 66, 66, 66, 170, 170, 170, 140, 20 }
+
+function Loot.relicPetForRoll(pets, roll)
+    for index, weight in ipairs(relicWeights) do
+        roll -= weight
+        if roll <= 0 then
+            return pets[index]
+        end
+    end
+    error("Relic roll exceeds the prize pool")
+end
+
 local rareChance = { ordinary = 15, rare = 35 }
 local eggs = {
     {

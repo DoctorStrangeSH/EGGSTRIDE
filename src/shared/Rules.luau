@@ -13,7 +13,22 @@ Rules.CarryMultiplier = 0.75
 Rules.StartCoins = 15
 Rules.GateX = 29
 Rules.HatchX = 14
-Rules.Prize = { vaultIndex = 2, bonus = 35 }
+Rules.Prizes = {
+    { id = "amber", name = "Янтарное призовое яйцо", vaultIndex = 2, bonus = 35 },
+    { id = "storm", name = "Грозовая реликвия", vaultIndex = 3, bonus = 60 },
+}
+Rules.RelicPets = {
+    { id = "cloud_lynx", name = "Облачная рысь", rarity = "Редкий", color = { 139, 218, 255 }, form = "ears" },
+    { id = "rain_heron", name = "Дождевая цапля", rarity = "Редкий", color = { 95, 158, 249 }, form = "wings" },
+    { id = "hail_ram", name = "Градовый баран", rarity = "Редкий", color = { 211, 235, 255 }, form = "horns" },
+    { id = "violet_ray", name = "Сиреневый скат", rarity = "Редкий", color = { 193, 150, 255 }, form = "fins" },
+    { id = "spark_marten", name = "Искровая куница", rarity = "Редкий", color = { 255, 154, 86 }, form = "tail" },
+    { id = "aurora_falcon", name = "Сияющий сокол", rarity = "Эпический", color = { 127, 255, 209 }, form = "wings" },
+    { id = "storm_wyvern", name = "Грозовая виверна", rarity = "Эпический", color = { 231, 118, 243 }, form = "horns" },
+    { id = "comet_otter", name = "Кометная выдра", rarity = "Эпический", color = { 120, 206, 255 }, form = "tail" },
+    { id = "dawn_phoenix", name = "Рассветный феникс", rarity = "Легендарный", color = { 255, 196, 86 }, form = "wings" },
+    { id = "eclipse_drake", name = "Дракон затмения", rarity = "Мифический", color = { 157, 116, 242 }, form = "horns" },
+}
 Rules.Abilities = {
     vine = { name = "Лиана", duration = 11, hint = "Через зелёный росток" },
     relay = { name = "Разряд", hint = "Через фиолетовый маяк" },
@@ -25,21 +40,21 @@ Rules.WindSwitch = { duration = 6, partnerRadius = 14 }
 Rules.StormTrial = { name = "Грозовой след", secondsLeft = 5 }
 Rules.Vaults = {
     {
-        id = "meadow", name = "Луговой", x = 76, coins = 32,
+        id = "meadow", name = "Луговой", x = 76, tier = 1, coins = 32,
         pets = {
             common = { id = "leaf_tail", name = "Листохвост", rarity = "Обычный", color = { 176, 220, 111 } },
             rare = { id = "dew_moth", name = "Росокрыл", rarity = "Редкий", color = { 113, 232, 235 } },
         },
     },
     {
-        id = "amber", name = "Янтарный", x = 180, coins = 54,
+        id = "amber", name = "Янтарный", x = 180, tier = 2, coins = 54,
         pets = {
             common = { id = "amber_crab", name = "Янтарный краб", rarity = "Обычный", color = { 255, 178, 76 } },
             rare = { id = "prism_fox", name = "Призмолис", rarity = "Редкий", color = { 255, 113, 165 } },
         },
     },
     {
-        id = "storm", name = "Грозовой", x = 320, coins = 95,
+        id = "storm", name = "Грозовой", x = 360, tier = 3, coins = 95,
         pets = {
             common = { id = "thunder_puff", name = "Громопух", rarity = "Обычный", color = { 182, 150, 255 } },
             rare = { id = "lightning_kite", name = "Молниехвост", rarity = "Редкий", color = { 255, 237, 108 } },
@@ -59,6 +74,10 @@ end
 
 function Rules.speed(tier, carrying)
     return Rules.Speeds[tier] * (if carrying then Rules.CarryMultiplier else 1)
+end
+
+function Rules.canUseVault(tier, vault)
+    return tier >= vault.tier
 end
 
 function Rules.canCollect(carrying, open, delivered)

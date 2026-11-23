@@ -36,9 +36,9 @@ assert(RoundPrize.claim(RoundPrize.new(), "first"))
 local petIds = {}
 for index, vault in ipairs(Rules.Vaults) do
     -- Budget extra distance for lateral movement and the detour around the wind trail.
-    local outward = (vault.x + 20) / Rules.speed(1, false)
-    local home = (vault.x - Rules.HatchX + 32) / Rules.speed(1, true)
-    assert(outward + home + 3 < Rules.RunSeconds, "Starter route budget: " .. vault.name)
+    local outward = (vault.x + 20) / Rules.speed(vault.tier, false)
+    local home = (vault.x - Rules.HatchX + 32) / Rules.speed(vault.tier, true)
+    assert(outward + home + 3 < Rules.RunSeconds, "Unlock-tier route budget: " .. vault.name)
 
     for _, pet in pairs(vault.pets) do
         assert(pet.id:match("^[a-z_]+$") and #pet.id <= 32, "Invalid companion id: " .. pet.id)
@@ -64,6 +64,40 @@ for index, vault in ipairs(Rules.Vaults) do
         assert(rareCount == (if egg == ordinary then 15 else 35))
     end
 end
+assert(Rules.canUseVault(1, Rules.Vaults[1]) and not Rules.canUseVault(1, Rules.Vaults[2]))
+assert(Rules.canUseVault(2, Rules.Vaults[2]) and not Rules.canUseVault(2, Rules.Vaults[3]))
+assert(Rules.canUseVault(3, Rules.Vaults[3]))
+assert(2 * Rules.Vaults[1].coins >= Rules.UpgradeCosts[2])
+
+local amberPrize = RoundPrize.new()
+local stormPrize = RoundPrize.new()
+assert(RoundPrize.claim(amberPrize, "first"))
+assert(RoundPrize.claim(stormPrize, "second"))
+assert(RoundPrize.deliver(stormPrize, "second"))
+assert(RoundPrize.release(amberPrize, "first"))
+assert(RoundPrize.claim(amberPrize, "third"))
+
+local relicIds = {}
+local relicRolls = {}
+local highRarityCount = 0
+assert(#Rules.RelicPets == 10)
+for _, pet in ipairs(Rules.RelicPets) do
+    assert(not petIds[pet.id] and not relicIds[pet.id])
+    relicIds[pet.id] = true
+end
+for roll = 1, 1000 do
+    local pet = Loot.relicPetForRoll(Rules.RelicPets, roll)
+    assert(relicIds[pet.id] and pet.rarity ~= "Обычный")
+    relicRolls[pet.id] = (relicRolls[pet.id] or 0) + 1
+    if pet.rarity ~= "Редкий" then
+        highRarityCount += 1
+    end
+end
+assert(highRarityCount == 670 and relicRolls.eclipse_drake == 20)
+for id in pairs(relicIds) do
+    assert(relicRolls[id] > 0)
+end
+
 assert(Rules.onboardingAfterPickup(1) == 2)
 assert(Rules.onboardingAfterPickup(2) == 2)
 assert(Rules.onboardingAfterPickup(3) == 4)

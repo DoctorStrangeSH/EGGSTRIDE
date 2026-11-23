@@ -18,6 +18,10 @@ for _, vault in ipairs(Rules.Vaults) do
     end
 end
 
+for _, pet in ipairs(Rules.RelicPets) do
+    petCatalog[pet.id] = pet
+end
+
 local weeklyGroup = "EggstrideWeeklyRunners"
 if not workspace:IsCollisionGroupRegistered(weeklyGroup) then
     workspace:RegisterCollisionGroup(weeklyGroup)
@@ -69,17 +73,19 @@ local entries = {}
 local loading = {}
 local closing = false
 local pending = 0
-local prize = RoundPrize.new()
+local prizes = {}
 
-local function showPrize(available, status)
-    World.showPrize(map.prize, available)
-    round:SetAttribute("PrizeStatus", status)
+local function showPrize(definition, available, status)
+    World.showPrize(map.prizes[definition.id], available)
+    round:SetAttribute("PrizeStatus_" .. definition.id, status)
 end
 
-local function releasePrize(player)
-    if RoundPrize.release(prize, player) then
-        showPrize(true, "Призовое яйцо снова на Янтарном")
+local function releasePrize(player, entry)
+    local definition = entry.prize
+    if definition and RoundPrize.release(prizes[definition.id], player) then
+        showPrize(definition, true, definition.name .. " снова на пьедестале")
     end
+    entry.prize = nil
 end
 local logAnalytics = not RunService:IsStudio()
 local onboardingSteps = {
@@ -114,7 +120,7 @@ local function leave(player)
         return
     end
     entries[player] = nil
-    releasePrize(player)
+    releasePrize(player, entry)
     pending += 1
     local ok, reason = ProfileStore.save(entry.session, Profile.snapshot(entry), true)
     pending -= 1
@@ -187,7 +193,18 @@ local function showPet(root, pet, stormTrailUnlocked)
     local body = accessory(root, "EggstridePet", accent, Vector3.new(1.9, 1.45, 1.7), Vector3.new(2.6, 0, 2.4))
     for _, x in ipairs({ -0.43, 0.43 }) do
         accessory(body, "Eye", Color3.fromRGB(46, 40, 61), Vector3.new(0.21, 0.27, 0.21), Vector3.new(x, 0.1, -0.72))
-        accessory(body, "Ear", accent, Vector3.new(0.44, 0.78, 0.47), Vector3.new(x * 1.55, 0.67, 0.05))
+        if pet.form == "wings" or pet.form == "fins" then
+            local size = if pet.form == "wings" then Vector3.new(1.5, 0.35, 0.78) else Vector3.new(1.15, 0.23, 1.2)
+            accessory(body, "Wing", accent, size, Vector3.new(x * 3.05, 0.18, 0.28))
+        elseif pet.form == "horns" then
+            accessory(body, "Horn", accent:Lerp(Color3.new(1, 1, 1), 0.55),
+                Vector3.new(0.24, 0.97, 0.3), Vector3.new(x * 1.35, 0.78, -0.16))
+        else
+            accessory(body, "Ear", accent, Vector3.new(0.44, 0.78, 0.47), Vector3.new(x * 1.55, 0.67, 0.05))
+        end
+    end
+    if pet.form == "tail" then
+        accessory(body, "Tail", accent, Vector3.new(0.55, 0.62, 1.65), Vector3.new(0, 0.2, 1.15))
     end
     if stormTrailUnlocked then
         local top = Instance.new("Attachment")
@@ -208,7 +225,7 @@ local function showPet(root, pet, stormTrailUnlocked)
 end
 
 local function clearEgg(player, entry)
-    releasePrize(player)
+    releasePrize(player, entry)
     entry.egg = nil
     entry.eggVault = nil
     entry.pickupAt = nil
@@ -369,7 +386,7 @@ local wasOpen = false
 local currentRound = -1
 local random = Random.new()
 local roundEggs = {}
-local prizeEgg
+local prizeEggs = {}
 local vineEndsAt = nil
 local windEnabled = workspace:GetAttribute("WindTrailEnabled") ~= false
 local windDirection = 0
@@ -517,14 +534,18 @@ local function hatch(player, entry, root, secondsLeft, now)
         entry.stormTrailUnlocked = true
     end
     local bonus = 0
-    if RoundPrize.deliver(prize, player) then
-        bonus = Rules.Prize.bonus
-        showPrize(false, "Приз доставил " .. player.DisplayName)
+    local definition = entry.prize
+    local awardedPrize = definition and RoundPrize.deliver(prizes[definition.id], player)
+    if awardedPrize then
+        bonus = definition.bonus
+        showPrize(definition, false, "Доставил: " .. player.DisplayName)
     end
     clearEgg(player, entry)
     entry.delivered = true
     entry.coins += vault.coins + bonus
-    local pet = Loot.hatchForRoll(vault, egg, random:NextInteger(1, 100))
+    local pet = if awardedPrize and definition.id == "storm" then
+        Loot.relicPetForRoll(Rules.RelicPets, random:NextInteger(1, 1000))
+        else Loot.hatchForRoll(vault, egg, random:NextInteger(1, 100))
     local isNew = entry.ownedPets[pet.id] == nil
     if isNew then
         entry.ownedPets[pet.id] = pet
@@ -548,9 +569,11 @@ local function syncRound()
     local newRound = currentRound ~= cycle
     if newRound then
         currentRound = cycle
-        prize = RoundPrize.new()
-        prizeEgg = Loot.eggForRoll(Rules.Prize.vaultIndex, random:NextInteger(1, 100))
-        showPrize(false, "")
+        for _, definition in ipairs(Rules.Prizes) do
+            prizes[definition.id] = RoundPrize.new()
+            prizeEggs[definition.id] = Loot.eggForRoll(definition.vaultIndex, random:NextInteger(1, 100))
+            showPrize(definition, false, "")
+        end
         windSwitchEndsAt = nil
         switchedWind = false
         windDirection = if windEnabled then Rules.windDirection(cycle) else 0
@@ -570,8 +593,10 @@ local function syncRound()
     end
     if open ~= wasOpen or newRound then
         wasOpen = open
-        if open and not prize.owner and not prize.delivered then
-            showPrize(true, "Призовое яйцо на Янтарном")
+        if open then
+            for _, definition in ipairs(Rules.Prizes) do
+                showPrize(definition, true, if definition.id == "storm" then "Реликвия на Грозовом" else "Приз на Янтарном")
+            end
         end
         map.gate.CanCollide = not open
         map.gate.Transparency = if open then 1 else 0.35
@@ -694,21 +719,27 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     publish(player, entry, "")
 end)
 
-local function pickUp(player, entry, root, vaultIndex, isPrize)
+local function pickUp(player, entry, root, vaultIndex, definition)
     local open, _, now = syncRound()
     if not Rules.canCollect(entry.egg ~= nil, open, entry.delivered) then
         return
     end
-    if isPrize then
-        if not RoundPrize.claim(prize, player) then
+    local vault = Rules.Vaults[vaultIndex]
+    if not Rules.canUseVault(entry.tier, vault) then
+        publish(player, entry, "Купи ускорение в лагере, чтобы забрать это яйцо.")
+        return
+    end
+    if definition then
+        if not RoundPrize.claim(prizes[definition.id], player) then
             return
         end
-        showPrize(false, player.DisplayName .. " несёт призовое яйцо")
+        entry.prize = definition
+        showPrize(definition, false, player.DisplayName .. " забрал приз")
     end
-    entry.egg = if isPrize then prizeEgg else roundEggs[vaultIndex]
+    entry.egg = if definition then prizeEggs[definition.id] else roundEggs[vaultIndex]
     entry.pickupAt = now
     advanceOnboarding(player, entry, Rules.onboardingAfterPickup(entry.onboarding))
-    entry.eggVault = Rules.Vaults[vaultIndex]
+    entry.eggVault = vault
     entry.eggVisual = accessory(root, "EggstrideEgg", World.VaultColors[vaultIndex],
         Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
     applySpeed(player, entry)
@@ -717,13 +748,15 @@ end
 
 for index, display in ipairs(map.vaults) do
     withNearbyPlayer(display.prompt, function(player, entry, root)
-        pickUp(player, entry, root, index, false)
+        pickUp(player, entry, root, index)
     end)
 end
 
-withNearbyPlayer(map.prize.prompt, function(player, entry, root)
-    pickUp(player, entry, root, Rules.Prize.vaultIndex, true)
-end)
+for _, definition in ipairs(Rules.Prizes) do
+    withNearbyPlayer(map.prizes[definition.id].prompt, function(player, entry, root)
+        pickUp(player, entry, root, definition.vaultIndex, definition)
+    end)
+end
 
 withNearbyPlayer(map.windTrail.leverPrompt, function(player, entry)
     if not syncRound() then
@@ -775,7 +808,9 @@ withNearbyPlayer(map.shop, function(player, entry)
         entry.coins -= cost
         entry.tier += 1
         applySpeed(player, entry)
-        publish(player, entry, "Скорость повышена до уровня " .. entry.tier .. ".")
+        local vault = Rules.Vaults[entry.tier]
+        publish(player, entry, if vault then "Открыт " .. vault.name .. " остров"
+            else "Скорость повышена до уровня " .. entry.tier .. ".")
     end
 end)
 

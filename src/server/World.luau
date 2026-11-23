@@ -82,9 +82,13 @@ local function vegetation(parent, name, x, z, size, angle)
     mesh.Parent = parent
 end
 
-local function runway(parent, fromX, toX, lane)
+local function runway(parent, fromX, toX, lane, exposed)
     local center = (fromX + toX) / 2
-    part(parent, "Мост", Vector3.new(toX - fromX, 1, 18), Vector3.new(center, -0.5, lane), Colors.wood, true)
+    part(parent, "Мост", Vector3.new(toX - fromX, 1, if exposed then 9 else 18),
+        Vector3.new(center, -0.5, lane), if exposed then Colors.lilac else Colors.wood, true)
+    if exposed then
+        return
+    end
     for _, z in ipairs({ -8.75, 8.75 }) do
         part(parent, "Бортик", Vector3.new(toX - fromX, 1.6, 0.5), Vector3.new(center, 0.8, lane + z), Colors.cream, true)
     end
@@ -305,10 +309,18 @@ function World.build(rules)
         if index == 2 then
             windTrail = buildWindTrail(scene, previousX + 19, vault.x - 19)
         elseif previousX then
-            runway(scene, previousX + 19, vault.x - 19, 0)
-            if index == 3 then
-                stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8)
+            local fromX, toX = previousX + 19, vault.x - 19
+            runway(scene, fromX, toX, -17)
+            runway(scene, fromX, toX, 12, true)
+            for _, x in ipairs({ fromX, toX }) do
+                local safe = part(scene, "Указатель широкого моста", Vector3.new(0.6, 2, 0.6),
+                    Vector3.new(x, 1, -22), Colors.wood, false)
+                local quick = part(scene, "Указатель грозовой тропы", Vector3.new(0.6, 2, 0.6),
+                    Vector3.new(x, 1, 16), Colors.lilac, false)
+                sign(safe, "Широкий мост")
+                sign(quick, "Короткая тропа")
             end
+            stormRelay = buildStormRelay(scene, vault.x - 10, previousX + 8)
         end
         island(scene, vault.x, 40, 54, Colors.grass:Lerp(accent, 0.6))
         local treeName = if index == 1 then "RoundTree" else "Pine"
@@ -327,24 +339,30 @@ function World.build(rules)
         previousX = vault.x
     end
 
-    local prizeX = rules.Vaults[rules.Prize.vaultIndex].x + 5
-    local pedestal = part(scene, "Призовой пьедестал", Vector3.new(6, 1, 6),
-        Vector3.new(prizeX, 0.5, -18), Colors.amber, false)
-    pedestal.Material = Enum.Material.Neon
-    local prize = part(scene, "Призовое яйцо", Vector3.new(2.4, 3.2, 2.4),
-        Vector3.new(prizeX, 2.6, -18), Colors.cream, false)
-    prize.Shape = Enum.PartType.Ball
-    local prizeDisplay = {
-        part = prize,
-        label = sign(prize, "Призовое яйцо\n+" .. rules.Prize.bonus .. " монет"),
-        prompt = prompt(prize, "Забрать призовое яйцо"),
-    }
-    World.showPrize(prizeDisplay, false)
+    local prizes = {}
+    for _, definition in ipairs(rules.Prizes) do
+        local vault = rules.Vaults[definition.vaultIndex]
+        local x, z = vault.x + 5, if definition.id == "storm" then 18 else -18
+        local accent = World.VaultColors[definition.vaultIndex]
+        local pedestal = part(scene, definition.name, Vector3.new(6, 1, 6),
+            Vector3.new(x, 0.5, z), accent, false)
+        pedestal.Material = Enum.Material.Neon
+        local egg = part(scene, definition.name, Vector3.new(2.4, 3.2, 2.4),
+            Vector3.new(x, 2.6, z), accent, false)
+        egg.Shape = Enum.PartType.Ball
+        local display = {
+            part = egg,
+            label = sign(egg, if definition.id == "storm" then definition.name else "Призовое яйцо"),
+            prompt = prompt(egg, if definition.id == "storm" then "Забрать реликвию" else "Забрать призовое яйцо"),
+        }
+        prizes[definition.id] = display
+        World.showPrize(display, false)
+    end
 
     local random = Random.new(73)
     for i = 1, 30 do
         local cloud = part(scene, "Облако", Vector3.new(20, 5, 10),
-            Vector3.new(random:NextNumber(-45, 350), random:NextNumber(-27, -10), random:NextNumber(31, 61) * (if i % 2 == 0 then 1 else -1)),
+            Vector3.new(random:NextNumber(-45, 400), random:NextNumber(-27, -10), random:NextNumber(31, 61) * (if i % 2 == 0 then 1 else -1)),
             Color3.fromRGB(239, 247, 255), false)
         cloud.Shape = Enum.PartType.Ball
     end
@@ -357,7 +375,7 @@ function World.build(rules)
         stormRelay = stormRelay,
         vine = vine,
         sprout = sprout,
-        prize = prizeDisplay,
+        prizes = prizes,
         hatch = hatch,
         shop = prompt(shop, "Купить скорость"),
         vaults = vaultDisplays,
