@@ -13,23 +13,24 @@ local cosmeticShop = shared:WaitForChild("CosmeticShop")
 local HatchEffects = require(script.Parent.HatchEffects)
 local CampThemes = require(script.Parent.CampThemes)
 local locale = require(script.Parent.InterfaceLanguage)
+local UiKit = require(script.Parent.UiKit)
 local tr = locale.text
 local updatePreference = shared:WaitForChild("UpdatePreference")
 
 local palette = {
-    panel = Color3.fromRGB(37, 34, 65),
-    row = Color3.fromRGB(55, 51, 86),
-    text = Color3.fromRGB(255, 251, 231),
+    panel = UiKit.Colors.ink,
+    row = UiKit.Colors.inkSoft,
+    text = UiKit.Colors.cream,
     muted = Color3.fromRGB(193, 190, 215),
-    gold = Color3.fromRGB(255, 209, 117),
-    mint = Color3.fromRGB(163, 255, 201),
+    gold = UiKit.Colors.gold,
+    mint = UiKit.Colors.mint,
 }
 
 local function textItem(className, parent, text, size, color)
     local item = Instance.new(className)
     item.BackgroundTransparency = 1
     item.Text = text
-    item.Font = Enum.Font.GothamBold
+    item.FontFace = UiKit.BodyFont
     item.TextSize = size
     item.TextWrapped = true
     item.TextColor3 = color
@@ -52,12 +53,16 @@ gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 local playerGui = player:WaitForChild("PlayerGui")
 gui.Parent = playerGui
 
-local header = playerGui:WaitForChild("EggstrideHud"):WaitForChild("Status"):WaitForChild("Header")
-local open = textItem("TextButton", header, tr("Питомцы"), 13, palette.panel)
+local header = playerGui:WaitForChild("EggstrideHud"):WaitForChild("Top"):WaitForChild("Status"):WaitForChild("Header")
+local open = UiKit.button(header, tr("Питомцы"), palette.gold, "🐾")
 open.AnchorPoint = Vector2.new(1, 0)
 open.Position = UDim2.fromScale(1, 0)
-open.Size = UDim2.fromOffset(102, 44)
-fill(open, palette.gold, 9)
+open.Size = UDim2.fromOffset(132, 44)
+open.TextScaled = true
+local openLimit = Instance.new("UITextSizeConstraint")
+openLimit.MaxTextSize = 16
+openLimit.Parent = open
+UiKit.padding(open, 6, 4)
 
 local scrim = Instance.new("Frame")
 scrim.Name = "Collection"
@@ -73,19 +78,37 @@ panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.Size = UDim2.new(1, -16, 1, -16)
 panel.Parent = scrim
-fill(panel, palette.panel, 12)
+fill(panel, palette.panel, 16)
+UiKit.stroke(panel, Color3.new(1, 1, 1), 1.5, 0.75)
+UiKit.gradient(panel, Color3.new(1, 1, 1), Color3.fromRGB(175, 165, 215))
 Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(440, 500)
+-- Bigger on large screens, capped so the card always fits the screen height.
+local journalScale = Instance.new("UIScale")
+journalScale.Parent = panel
+local function fitJournal()
+    local camera = workspace.CurrentCamera
+    if camera then
+        local fit = (camera.ViewportSize.Y - 24) / 500
+        journalScale.Scale = math.max(1, math.min(UiKit.scaleFor(camera.ViewportSize), fit))
+    end
+end
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitJournal)
+end
+fitJournal()
 
-local title = textItem("TextLabel", panel, tr("Коллекция"), 17, palette.text)
+local title = textItem("TextLabel", panel, "🥚 " .. tr("Коллекция"), 20, palette.text)
+title.FontFace = UiKit.Font
+UiKit.textStroke(title)
 title.Position = UDim2.fromOffset(12, 4)
 title.Size = UDim2.new(1, -108, 0, 44)
 title.TextXAlignment = Enum.TextXAlignment.Left
 
-local close = textItem("TextButton", panel, tr("Закрыть"), 13, palette.text)
+local close = UiKit.button(panel, tr("Закрыть"), palette.row, "✕")
 close.AnchorPoint = Vector2.new(1, 0)
 close.Position = UDim2.new(1, -8, 0, 4)
-close.Size = UDim2.fromOffset(80, 44)
-fill(close, palette.row, 9)
+close.Size = UDim2.fromOffset(96, 44)
+close.TextSize = 14
 
 local function updateLauncher()
     local racing = player:GetAttribute("WeeklyStartsAt") ~= nil
@@ -831,7 +854,7 @@ update = function()
         group.button.Text = string.format("%s · %d/%d  %s", tr(group.name), groupCounts[group] or 0,
             #group.rows, if group.expanded then "−" else "+")
     end
-    open.Text = tr("Питомцы %d/%d", count, #rows)
+    open.Text = "🐾 " .. tr("Питомцы %d/%d", count, #rows)
     title.Text = tr("Коллекция %d/%d", count, #rows)
 end
 

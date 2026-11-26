@@ -27,40 +27,51 @@ for _, point in ipairs(Rules.Weekly.order) do
     end
 end
 
+local UiKit = require(script.Parent:WaitForChild("UiKit"))
+local palette = UiKit.Colors
 local colors = {
-    ink = Color3.fromRGB(37, 34, 65),
-    button = Color3.fromRGB(55, 51, 86),
-    white = Color3.fromRGB(255, 251, 231),
-    gold = Color3.fromRGB(255, 209, 117),
-    mint = Color3.fromRGB(163, 255, 201),
+    ink = palette.ink,
+    button = palette.inkSoft,
+    white = palette.cream,
+    gold = palette.gold,
+    mint = palette.mint,
 }
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "EggstrideHud"
 gui.AutoLocalize = false
 gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 
-local panel = Instance.new("Frame")
-panel.Name = "Status"
-panel.AnchorPoint = Vector2.new(0.5, 0)
-panel.Position = UDim2.new(0.5, 0, 0, 6)
-panel.Size = UDim2.new(1, -16, 0, 0)
-panel.AutomaticSize = Enum.AutomaticSize.Y
-panel.BackgroundColor3 = colors.ink
-panel.BackgroundTransparency = 0.12
-panel.Parent = gui
-Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 12)
-Instance.new("UISizeConstraint", panel).MaxSize = Vector2.new(364, math.huge)
+-- Top column: status card, then alert pills below it. Scaled as one block.
+local top = Instance.new("Frame")
+top.Name = "Top"
+top.AnchorPoint = Vector2.new(0.5, 0)
+top.Position = UDim2.new(0.5, 0, 0, 6)
+top.Size = UDim2.new(1, -16, 0, 0)
+top.AutomaticSize = Enum.AutomaticSize.Y
+top.BackgroundTransparency = 1
+top.Parent = gui
+Instance.new("UISizeConstraint", top).MaxSize = Vector2.new(380, math.huge)
+UiKit.list(top, 8)
+UiKit.scaled(top)
 
-local padding = Instance.new("UIPadding", panel)
-padding.PaddingLeft = UDim.new(0, 8)
-padding.PaddingRight = UDim.new(0, 8)
-padding.PaddingTop = UDim.new(0, 4)
-padding.PaddingBottom = UDim.new(0, 6)
-local stack = Instance.new("UIListLayout", panel)
-stack.SortOrder = Enum.SortOrder.LayoutOrder
-stack.Padding = UDim.new(0, 2)
+local panel = UiKit.panel(top, "Status")
+panel.LayoutOrder = 1
+panel.Size = UDim2.new(1, 0, 0, 0)
+panel.AutomaticSize = Enum.AutomaticSize.Y
+UiKit.padding(panel, 10, 6)
+local stack = UiKit.list(panel, 4, nil, Enum.HorizontalAlignment.Left)
+
+local alerts = Instance.new("Frame")
+alerts.Name = "Alerts"
+alerts.LayoutOrder = 2
+alerts.Size = UDim2.new(1, 0, 0, 0)
+alerts.AutomaticSize = Enum.AutomaticSize.Y
+alerts.BackgroundTransparency = 1
+alerts.Parent = top
+UiKit.list(alerts, 6)
 
 local header = Instance.new("Frame")
 header.Name = "Header"
@@ -69,32 +80,85 @@ header.BackgroundTransparency = 1
 header.Parent = panel
 
 local function label(parent, name, order, size, color)
-    local item = Instance.new("TextLabel")
+    local item = UiKit.label(parent, "", size, color, UiKit.BodyFont)
     item.Name = name
     item.LayoutOrder = order
-    item.Size = UDim2.new(1, 0, 0, 0)
-    item.AutomaticSize = Enum.AutomaticSize.Y
-    item.BackgroundTransparency = 1
-    item.Font = Enum.Font.GothamMedium
-    item.Text = ""
-    item.TextSize = size
-    item.TextColor3 = color
-    item.TextWrapped = true
     item.TextXAlignment = Enum.TextXAlignment.Left
-    item.Parent = parent
     return item
 end
 
-local timer = label(header, "Timer", 0, 15, colors.gold)
-timer.Size = UDim2.new(1, -110, 1, 0)
+local timer = label(header, "Timer", 0, 22, colors.gold)
+timer.FontFace = UiKit.Font
+timer.Size = UDim2.new(1, -140, 1, 0)
 timer.AutomaticSize = Enum.AutomaticSize.None
-timer.Font = Enum.Font.GothamBold
-local stats = label(panel, "Stats", 1, 13, colors.white)
-local objective = label(panel, "Objective", 2, 13, colors.mint)
-local notice = label(panel, "Notice", 3, 12, colors.white)
+timer.TextScaled = true
+local timerLimit = Instance.new("UITextSizeConstraint")
+timerLimit.MaxTextSize = 24
+timerLimit.Parent = timer
+UiKit.textStroke(timer)
+local stats = label(panel, "Stats", 1, 14, colors.white)
+local objective = label(panel, "Objective", 2, 15, colors.mint)
+objective.FontFace = UiKit.Font
+UiKit.textStroke(objective)
+local notice = label(panel, "Notice", 3, 14, colors.white)
+notice.BackgroundColor3 = palette.inkSoft
+notice.BackgroundTransparency = 0.1
+UiKit.corner(notice, 8)
+UiKit.padding(notice, 8, 4)
+
+-- Wallet: coins, income, speed and rebirths, top-left under the Roblox buttons.
+local wallet = Instance.new("Frame")
+wallet.Name = "Wallet"
+wallet.Position = UDim2.fromOffset(8, 6)
+wallet.AutomaticSize = Enum.AutomaticSize.XY
+wallet.BackgroundTransparency = 1
+wallet.Parent = gui
+UiKit.list(wallet, 6, nil, Enum.HorizontalAlignment.Left)
+UiKit.scaled(wallet)
+local coinPill = UiKit.pill(wallet, "Coins", palette.goldDeep)
+coinPill.LayoutOrder = 1
+coinPill.TextSize = 20
+local incomePill = UiKit.pill(wallet, "Income", Color3.fromRGB(60, 160, 110))
+incomePill.LayoutOrder = 2
+local speedPill = UiKit.pill(wallet, "Speed", palette.sky)
+speedPill.LayoutOrder = 3
+local rebirthPill = UiKit.pill(wallet, "Rebirths", palette.pink)
+rebirthPill.LayoutOrder = 4
+
+-- Left-edge column for action buttons, clear of the thumbstick and jump button.
+local side = Instance.new("Frame")
+side.Name = "Side"
+side.AnchorPoint = Vector2.new(0, 0.5)
+side.Position = UDim2.new(0, 8, 0.5, 0)
+side.AutomaticSize = Enum.AutomaticSize.XY
+side.BackgroundTransparency = 1
+side.Parent = gui
+UiKit.list(side, 8, nil, Enum.HorizontalAlignment.Left)
+UiKit.scaled(side)
+
+local function updateWallet()
+    local weekly = player:GetAttribute("WeeklyStartsAt") ~= nil
+    wallet.Visible = not weekly
+    UiKit.countTo(coinPill, player:GetAttribute("Coins") or 0, function(value)
+        return "🪙 " .. tostring(value)
+    end)
+    incomePill.Text = "💰 " .. text("База +%d/мин", player:GetAttribute("BaseIncome") or 0)
+    speedPill.Text = "⚡ " .. text("Скорость %d/%d", player:GetAttribute("SpeedTier") or 1, #Rules.Speeds)
+    local rebirths = player:GetAttribute("Rebirths") or 0
+    rebirthPill.Visible = rebirths > 0
+    rebirthPill.Text = "🌸 " .. text("Перерождений: %d", rebirths)
+end
+for _, name in ipairs({ "Coins", "BaseIncome", "SpeedTier", "Rebirths", "WeeklyStartsAt" }) do
+    player:GetAttributeChangedSignal(name):Connect(updateWallet)
+end
+updateWallet()
 
 gui.Parent = player:WaitForChild("PlayerGui")
 local updateFeedback = RunFeedback.connect(gui, shared:WaitForChild("RunFeedback"), Rules, player, locale)
+local resultCard = gui:FindFirstChild("RunResult")
+if resultCard then
+    UiKit.scaled(resultCard)
+end
 
 local runOpen = false
 local guide = Instance.new("Highlight")
@@ -141,12 +205,14 @@ local function exitButton(parent, name, caption, position, size, background, for
     button.Position = position
     button.Size = size
     button.TextWrapped = true
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 13
+    button.FontFace = UiKit.Font
+    button.TextSize = 15
+    button.AutoButtonColor = true
     button.BackgroundColor3 = background
     button.TextColor3 = foreground
     button.Parent = parent
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
+    UiKit.corner(button, 12)
+    UiKit.stroke(button, palette.ink, 2)
     return button
 end
 
@@ -228,7 +294,8 @@ local function update()
     local abilityId = player:GetAttribute("EggAbility")
     local ability = Rules.Abilities[abilityId]
     local tier = player:GetAttribute("SpeedTier") or 1
-    stats.Text = text("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
+    -- Coins, speed and income are in the wallet; this line is only for the weekly run.
+    stats.Text = ""
     local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm_" .. locale.language)
         elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber_" .. locale.language)
         else round:GetAttribute("PrizeStatus_meadow_" .. locale.language) or text("Луговое яйцо доступно каждому")
@@ -270,12 +337,16 @@ local function update()
         waypoint.StudsOffsetWorldSpace = Vector3.new(0, height, 0)
     end
     guide.Adornee = target
+    stats.Visible = stats.Text ~= ""
+    if objective.Text ~= "" and not string.find(objective.Text, "🎯", 1, true) then
+        objective.Text = "🎯 " .. objective.Text
+    end
     objective.Visible = objective.Text ~= ""
     updateGuide()
     updateNotice()
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "EggReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
+for _, name in ipairs({ "BaseIncome", "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "EggReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do
@@ -305,8 +376,8 @@ while true do
         end
         local closing = open and left <= 5
         local phase = if closing then "Ворота закроются" elseif open then "Забег" else "Подготовка"
-        timer.Text = text("%s  ·  %02d сек", text(phase), left)
-        timer.TextColor3 = if closing then Color3.fromRGB(255, 147, 137) else colors.gold
+        timer.Text = (if closing then "⏰ " elseif open then "🏃 " else "⏳ ") .. text("%s  ·  %02d сек", text(phase), left)
+        timer.TextColor3 = if closing then palette.danger else colors.gold
         updateFeedback(open, left, player:GetAttribute("CarryingEgg") == true, weeklyStart ~= nil)
     end
     local endsAt = player:GetAttribute("WeeklyEndsAt")

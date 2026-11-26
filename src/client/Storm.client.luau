@@ -1,0 +1,53 @@
+-- Sky storm banner and lightning flashes.
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Eggstride")
+local locale = require(script.Parent.InterfaceLanguage)
+local text = locale.text
+
+local UiKit = require(script.Parent:WaitForChild("UiKit"))
+
+local function update()
+    local state = Shared:GetAttribute("StormState")
+    local spot = Shared:GetAttribute("StormSpot")
+    local carrier = Shared:GetAttribute("StormCarrier")
+    local message
+    if state == "next" then
+        message = text("В следующем раунде — небесный шторм!")
+    elseif state == "warning" then
+        message = text("Небесный шторм начинается!")
+    elseif state == "active" and carrier then
+        message = text("%s несёт золотое яйцо! Перехвати!", carrier)
+    elseif state == "active" and spot then
+        message = text("Золотое яйцо над %s! Лети через поток", text(spot))
+    end
+    local summoner = Shared:GetAttribute("StormSummoner")
+    if message and summoner then
+        message = text("Шторм от %s · ", summoner) .. message
+    end
+    local color = if state == "active" and carrier then UiKit.Colors.goldDeep else UiKit.Colors.violet
+    UiKit.alert("storm", if message then "🌩 " .. message else nil, color, state == "active" or state == "warning")
+end
+for _, name in ipairs({ "StormState", "StormSpot", "StormCarrier", "StormSummoner" }) do
+    Shared:GetAttributeChangedSignal(name):Connect(update)
+end
+update()
+
+-- Local lightning: a short flash every few seconds while the storm is active.
+task.spawn(function()
+    local random = Random.new()
+    while true do
+        task.wait(random:NextNumber(3, 7))
+        if Shared:GetAttribute("StormState") == "active" then
+            local brightness = Lighting.Brightness
+            Lighting.Brightness = brightness + 3
+            task.wait(0.08)
+            Lighting.Brightness = brightness
+            task.wait(0.1)
+            Lighting.Brightness = brightness + 2
+            task.wait(0.06)
+            Lighting.Brightness = brightness
+        end
+    end
+end)
