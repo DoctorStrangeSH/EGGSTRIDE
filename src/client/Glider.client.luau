@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Glide = require(Shared:WaitForChild("Glide"))
+local Storm = require(Shared:WaitForChild("Storm"))
 local locale = require(script.Parent.InterfaceLanguage)
 
 local player = Players.LocalPlayer
@@ -135,8 +136,27 @@ if player.Character then
     task.spawn(onCharacter, player.Character)
 end
 
+-- Updraft columns (permanent and storm ones) are tagged parts with Radius and Height.
+local function updraftAt(position)
+    for _, column in ipairs(CollectionService:GetTagged("EggstrideUpdraft")) do
+        local radius, height = column:GetAttribute("Radius"), column:GetAttribute("Height")
+        if radius and height and Glide.inUpdraft({ x = column.Position.X, z = column.Position.Z, radius = radius, height = height }, position) then
+            return true
+        end
+    end
+    return false
+end
+
 RunService.Heartbeat:Connect(function()
     if not gliding then
+        -- Stepping into an updraft lifts you and opens the glider.
+        if allowed() and updraftAt(root.Position) and os.clock() - lastPadAt > Glide.PadCooldown then
+            lastPadAt = os.clock()
+            launchedAt = os.clock()
+            root.AssemblyLinearVelocity = Vector3.new(0, Glide.UpdraftRise, 0)
+            humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+            setGliding(true)
+        end
         return
     end
     if not allowed() then
@@ -159,14 +179,11 @@ RunService.Heartbeat:Connect(function()
     end
     direction = direction.Unit
     local speed = Glide.horizontalSpeed(humanoid.WalkSpeed)
-    local position = root.Position
-    local inUpdraft = false
-    for _, updraft in ipairs(Glide.Updrafts) do
-        if Glide.inUpdraft(updraft, position) then
-            inUpdraft = true
-        end
+    if Shared:GetAttribute("StormState") == "active" then
+        speed *= Storm.GlideBoost
     end
-    local sink = Glide.sinkMultiplier(player:GetAttribute("CarryingEgg") == true,
+    local inUpdraft = updraftAt(root.Position)
+    local sink = Glide.sinkMultiplier(player:GetAttribute("CarryingEgg") == true or player:GetAttribute("CarryingGolden") == true,
         player:GetAttribute("CarryingStolen") ~= nil, player:GetAttribute("EggStage"))
     local vertical = Glide.verticalSpeed(root.AssemblyLinearVelocity.Y, sink, inUpdraft)
     root.AssemblyLinearVelocity = Vector3.new(direction.X * speed, vertical, direction.Z * speed)

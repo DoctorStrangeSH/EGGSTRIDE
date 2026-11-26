@@ -123,7 +123,7 @@ function BaseService.new(parent, deps)
             lockedUntil = entry.lockedUntil,
             shieldUntil = if shield > 0 then t + shield else 0,
             beingStolen = entry.beingStolen,
-            carryingEgg = entry.egg ~= nil,
+            carryingEgg = entry.egg ~= nil or entry.golden == true,
             stolen = entry.stolen,
         }
     end
@@ -162,6 +162,11 @@ function BaseService.new(parent, deps)
                 publish(victim, victimEntry, "Питомец вернулся на твою базу!")
             end
         end
+    end
+
+    function self.plotCenter(entry)
+        local plot = plotOf(entry)
+        return plot and plot.center
     end
 
     function self.join(player, entry, record)

@@ -24,6 +24,7 @@ local PlaytestReport = require(script.Parent.PlaytestReport)
 local BaseService = require(script.Parent.BaseService)
 local LivingEgg = require(Shared.LivingEgg)
 local GlideService = require(script.Parent.GlideService)
+local StormService = require(script.Parent.StormService)
 
 local inStudio = RunService:IsStudio()
 local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
@@ -251,6 +252,7 @@ local function applySpeed(player, entry)
         else
             humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil or entry.stolen ~= nil) * (entry.windFactor or 1)
                 * (if entry.egg and entry.living then LivingEgg.speed(entry.eggStage) else 1)
+                * (if entry.golden then 0.8 else 1)
         end
     end
 end
@@ -484,6 +486,21 @@ bases = BaseService.new(workspace, {
     end,
 })
 
+local storm = StormService.new({
+    entries = entries,
+    catalog = petCatalog,
+    publish = publish,
+    translate = translate,
+    characterParts = characterParts,
+    applySpeed = applySpeed,
+    startedAt = startedAt,
+    bases = bases,
+    hatchPosition = map.hatch.Position,
+    expired = function(session)
+        return ProfileStore.expired(session)
+    end,
+})
+
 local function join(player)
     if closing or player.Parent ~= Players or entries[player] or loading[player] then
         return
@@ -589,6 +606,7 @@ local function join(player)
         stopWeekly(player, entry)
         clearEgg(player, entry, "respawn")
         bases.dropStolen(player, entry, nil)
+        storm.drop(player, nil)
         publish(player, entry)
         cosmeticShop.apply(player, entry)
         if entry.pet then
@@ -604,6 +622,7 @@ local function join(player)
                 runFeedback:FireClient(player, "WeeklyStopped")
             end
             bases.dropStolen(player, entry, "Ты уронил украденного питомца.")
+            storm.drop(player, "Ты уронил золотое яйцо! Оно вернулось в небо.")
             local lost = entry.egg ~= nil
             clearEgg(player, entry, "fall")
             if lost then
@@ -1035,7 +1054,7 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     if root.Anchored then
         return
     end
-    if entry.stolen then
+    if entry.stolen or entry.golden then
         publish(player, entry, "Руки заняты: сначала донеси груз.")
         return
     end
@@ -1077,7 +1096,7 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
 end)
 
 local function pickUp(player, entry, root, vaultIndex, definition)
-    if entry.stolen then
+    if entry.stolen or entry.golden then
         publish(player, entry, "Руки заняты: сначала донеси груз.")
         return
     end
@@ -1414,7 +1433,7 @@ local function showGlow(player, entry)
             local humanoid, thiefRoot = characterParts(interceptor)
             local _, carrierRoot = characterParts(player)
             if interceptor == player or closing or not thiefEntry or not carrierEntry or carrierEntry ~= entry
-                or not entry.living or entry.interceptPrompt ~= prompt or thiefEntry.weekly or thiefEntry.stolen
+                or not entry.living or entry.interceptPrompt ~= prompt or thiefEntry.weekly or thiefEntry.stolen or thiefEntry.golden
                 or ProfileStore.expired(thiefEntry.session) or not humanoid or humanoid.Health <= 0
                 or not thiefRoot or not carrierRoot
                 or (thiefRoot.Position - carrierRoot.Position).Magnitude > LivingEgg.InterceptRadius + 2 then

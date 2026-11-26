@@ -89,7 +89,7 @@ end
 -- Interception prompts hang on carriers: hide your own, translate the rest.
 local function watchIntercept(prompt)
     prompt.ActionText = text("Перехватить")
-    prompt.ObjectText = text("Сияющее яйцо")
+    prompt.ObjectText = text(prompt:GetAttribute("ObjectSource") or "Сияющее яйцо")
     if prompt:GetAttribute("CarrierUserId") == player.UserId then
         prompt.Enabled = false
     end

@@ -94,6 +94,9 @@ function GlideService.build(parent)
             Colors.pad)
         column.Shape = Enum.PartType.Cylinder
         column.Transparency = 0.85
+        column:SetAttribute("Radius", updraft.radius)
+        column:SetAttribute("Height", updraft.height)
+        CollectionService:AddTag(column, "EggstrideUpdraft")
         -- The column is rotated, so its Right face points up.
         rising(column, Colors.cream, 30, 40).EmissionDirection = Enum.NormalId.Right
     end
