@@ -42,9 +42,14 @@ local function sign(anchor, text)
     label.BackgroundColor3 = Colors.plum
     label.BackgroundTransparency = 0.18
     label.TextColor3 = Colors.cream
-    label.Font = Enum.Font.GothamBold
+    label.Font = Enum.Font.FredokaOne
     label.TextScaled = true
     label.AutoLocalize = false
+    local outline = Instance.new("UIStroke")
+    outline.Color = Color3.fromRGB(28, 24, 54)
+    outline.Thickness = 1.5
+    outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+    outline.Parent = label
     label.Text = text
     label:SetAttribute("SourceText", text)
     CollectionService:AddTag(label, "EggstrideWorldText")

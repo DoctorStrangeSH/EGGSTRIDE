@@ -368,6 +368,8 @@ local english = {
     ["Лунный светляк"] = "Lunar Firefly",
     ["Полярный светляк"] = "Polar Firefly",
     -- Player bases
+    ["Скорость %d/%d"] = "Speed %d/%d",
+    ["Перерождений: %d"] = "Rebirths: %d",
     ["Вызвать шторм"] = "Summon a Storm",
     ["Небесный шторм для всего сервера в следующем раунде"] = "A sky storm for the whole server next round",
     ["Шторм вызван! Он начнётся через %d раунд(а)."] = "Storm summoned! It starts in %d round(s).",

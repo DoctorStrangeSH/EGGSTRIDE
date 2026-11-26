@@ -27,31 +27,10 @@ local guidedPad
 local lastPadAt = 0
 local hintShown = false
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "EggstrideGlider"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-local hint = Instance.new("TextLabel")
-hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -120)
-hint.Size = UDim2.fromOffset(300, 30)
-hint.BackgroundColor3 = Color3.fromRGB(40, 37, 73)
-hint.BackgroundTransparency = 0.2
-hint.TextColor3 = Color3.fromRGB(255, 223, 155)
-hint.Font = Enum.Font.GothamBold
-hint.TextScaled = true
-hint.Visible = false
-hint.Parent = gui
-Instance.new("UICorner", hint).CornerRadius = UDim.new(0, 8)
+local UiKit = require(script.Parent:WaitForChild("UiKit"))
 
 local function showHint(source)
-    hint.Text = locale.text(source)
-    hint.Visible = true
-    task.delay(3, function()
-        if hint.Text == locale.text(source) then
-            hint.Visible = false
-        end
-    end)
+    UiKit.toast("glide", "🪂 " .. locale.text(source), UiKit.Colors.sky, 3.5)
 end
 
 local function allowed()

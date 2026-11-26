@@ -137,56 +137,29 @@ end
 player:GetAttributeChangedSignal("Rebirths"):Connect(updateRebirth)
 player:GetAttributeChangedSignal("Coins"):Connect(updateRebirth)
 
--- Robbery alert and product buttons.
-local gui = Instance.new("ScreenGui")
-gui.Name = "EggstrideBases"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local alert = Instance.new("TextLabel")
-alert.Name = "RobberyAlert"
-alert.AnchorPoint = Vector2.new(0.5, 0)
-alert.Position = UDim2.new(0.5, 0, 0, 64)
-alert.Size = UDim2.fromOffset(320, 40)
-alert.BackgroundColor3 = Color3.fromRGB(200, 50, 70)
-alert.TextColor3 = Color3.new(1, 1, 1)
-alert.Font = Enum.Font.GothamBold
-alert.TextScaled = true
-alert.Visible = false
-alert.Parent = gui
-Instance.new("UICorner", alert).CornerRadius = UDim.new(0, 8)
-
-local carrying = alert:Clone()
-carrying.Name = "CarryingStolen"
-carrying.BackgroundColor3 = Color3.fromRGB(70, 60, 140)
-carrying.Parent = gui
+-- Robbery, stolen cargo and egg glow alerts, stacked under the HUD.
+local UiKit = require(script.Parent:WaitForChild("UiKit"))
+local colors = UiKit.Colors
 
 local function updateAlerts()
     local thief = player:GetAttribute("BaseRobbed")
-    alert.Visible = thief ~= nil
-    alert.Text = if thief then text("%s крадёт твоего питомца!", thief) else ""
+    UiKit.alert("robbed", if thief then "🚨 " .. text("%s крадёт твоего питомца!", thief) else nil, colors.berry, true)
     local pet = player:GetAttribute("CarryingStolen")
-    carrying.Visible = pet ~= nil
-    carrying.Text = if pet then text("Неси %s на свою базу!", text(pet)) else ""
+    UiKit.alert("carrying", if pet then "🏃 " .. text("Неси %s на свою базу!", text(pet)) else nil, colors.violet, true)
 end
-local glow = alert:Clone()
-glow.Name = "EggGlow"
-glow.Position = UDim2.new(0.5, 0, 0, 110)
-glow.Size = UDim2.fromOffset(260, 32)
-glow.BackgroundColor3 = Color3.fromRGB(240, 170, 50)
-glow.Parent = gui
 
+local stageColors = { colors.inkSoft, colors.goldDeep, Color3.fromRGB(255, 120, 80), colors.pink }
 local function updateGlow()
     local stage = player:GetAttribute("EggStage")
     local definition = stage and LivingEgg.Stages[stage]
-    glow.Visible = definition ~= nil
-    if definition then
-        local nextStage = LivingEgg.Stages[stage + 1]
-        glow.Text = text(definition.name) .. "  ·  ×" .. tostring(definition.coins)
-            .. (if nextStage then "" else "  ·  " .. text("Максимум!"))
-        glow.BackgroundColor3 = Color3.fromRGB(240, 170, 50):Lerp(Color3.fromRGB(255, 90, 200), (stage - 1) / 3)
+    if not definition then
+        UiKit.alert("glow", nil)
+        return
     end
+    local nextStage = LivingEgg.Stages[stage + 1]
+    local stars = string.rep("★", stage - 1) .. string.rep("☆", #LivingEgg.Stages - stage)
+    UiKit.alert("glow", "🥚 " .. text(definition.name) .. "  " .. stars .. "  ×" .. tostring(definition.coins)
+        .. (if nextStage then "" else "  " .. text("Максимум!")), stageColors[stage], stage == #LivingEgg.Stages)
 end
 player:GetAttributeChangedSignal("EggStage"):Connect(updateGlow)
 updateGlow()
@@ -195,48 +168,38 @@ player:GetAttributeChangedSignal("BaseRobbed"):Connect(updateAlerts)
 player:GetAttributeChangedSignal("CarryingStolen"):Connect(updateAlerts)
 updateAlerts()
 
-local shop = Instance.new("Frame")
-shop.Name = "BaseProducts"
-shop.AnchorPoint = Vector2.new(0, 1)
-shop.Position = UDim2.new(0, 12, 1, -12)
-shop.Size = UDim2.fromOffset(150, 126)
-shop.BackgroundTransparency = 1
-shop.Visible = false
-shop.Parent = gui
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 6)
-layout.Parent = shop
-
+-- Product buttons in the left column.
+local productLook = {
+    shield = { icon = "🛡", color = colors.sky },
+    income = { icon = "💰", color = colors.goldDeep },
+    storm = { icon = "🌩", color = colors.violet },
+}
+local productButtons = {}
 local function refreshShop()
     local studio = Shared:GetAttribute("StudioProducts") == true
-    local any = studio
-    for _, key in ipairs(Bases.ProductOrder) do
-        if Shared:GetAttribute("ProductId_" .. key) then
-            any = true
-        end
+    for key, button in pairs(productButtons) do
+        button.Visible = studio or Shared:GetAttribute("ProductId_" .. key) ~= nil
     end
-    shop.Visible = any
 end
 
 for index, key in ipairs(Bases.ProductOrder) do
     local product = Bases.Products[key]
-    local button = Instance.new("TextButton")
+    local look = productLook[key]
+    local button = UiKit.button(UiKit.sideColumn(), text(product.name), look.color, look.icon)
     button.Name = key
-    button.LayoutOrder = index
-    button.Size = UDim2.fromOffset(150, 38)
-    button.BackgroundColor3 = if key == "shield" then Color3.fromRGB(80, 150, 230)
-        elseif key == "storm" then Color3.fromRGB(130, 80, 220) else Color3.fromRGB(240, 170, 50)
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Font = Enum.Font.GothamBold
-    button.TextScaled = true
-    button.Text = text(product.name)
-    button.Parent = shop
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+    button.LayoutOrder = 10 + index
+    button.Size = UDim2.fromOffset(150, 44)
+    button.TextSize = 15
+    button.Visible = false
+    productButtons[key] = button
     button.Activated:Connect(function()
         action:FireServer("Buy", key)
     end)
 end
 Shared:GetAttributeChangedSignal("StudioProducts"):Connect(refreshShop)
+for _, key in ipairs(Bases.ProductOrder) do
+    Shared:GetAttributeChangedSignal("ProductId_" .. key):Connect(refreshShop)
+end
 refreshShop()
 
 -- Signs and barriers change every second, so redraw them on a timer.

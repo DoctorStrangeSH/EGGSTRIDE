@@ -6,28 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local locale = require(script.Parent.InterfaceLanguage)
 local text = locale.text
 
-local player = Players.LocalPlayer
-local gui = Instance.new("ScreenGui")
-gui.Name = "EggstrideStorm"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local banner = Instance.new("TextLabel")
-banner.AnchorPoint = Vector2.new(0.5, 0)
-banner.Position = UDim2.new(0.5, 0, 0, 150)
-banner.Size = UDim2.fromOffset(360, 36)
-banner.BackgroundColor3 = Color3.fromRGB(60, 40, 110)
-banner.BackgroundTransparency = 0.1
-banner.TextColor3 = Color3.fromRGB(255, 215, 90)
-banner.Font = Enum.Font.GothamBlack
-banner.TextScaled = true
-banner.Visible = false
-banner.Parent = gui
-Instance.new("UICorner", banner).CornerRadius = UDim.new(0, 8)
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(255, 205, 70)
-stroke.Thickness = 2
-stroke.Parent = banner
+local UiKit = require(script.Parent:WaitForChild("UiKit"))
 
 local function update()
     local state = Shared:GetAttribute("StormState")
@@ -47,8 +26,8 @@ local function update()
     if message and summoner then
         message = text("Шторм от %s · ", summoner) .. message
     end
-    banner.Visible = message ~= nil
-    banner.Text = message or ""
+    local color = if state == "active" and carrier then UiKit.Colors.goldDeep else UiKit.Colors.violet
+    UiKit.alert("storm", if message then "🌩 " .. message else nil, color, state == "active" or state == "warning")
 end
 for _, name in ipairs({ "StormState", "StormSpot", "StormCarrier", "StormSummoner" }) do
     Shared:GetAttributeChangedSignal(name):Connect(update)
