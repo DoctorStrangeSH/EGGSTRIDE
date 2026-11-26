@@ -23,6 +23,7 @@ local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
 local PlaytestReport = require(script.Parent.PlaytestReport)
 local BaseService = require(script.Parent.BaseService)
 local LivingEgg = require(Shared.LivingEgg)
+local GlideService = require(script.Parent.GlideService)
 
 local inStudio = RunService:IsStudio()
 local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
@@ -456,6 +457,8 @@ local cosmeticShop = CosmeticShop.start(cosmetics, Shared, MarketplaceService, i
     end
     return nil
 end)
+
+GlideService.build(workspace)
 
 bases = BaseService.new(workspace, {
     entries = entries,
@@ -1114,7 +1117,7 @@ local function pickUp(player, entry, root, vaultIndex, definition)
         player:SetAttribute("EggStage", 1)
     end
     applySpeed(player, entry)
-    publish(player, entry, if entry.living then "Чем дольше несёшь яйцо вне лагеря, тем оно ценнее!" else "")
+    publish(player, entry, if entry.living then "Яйцо разгорается на дальних островах: чем дольше несёшь, тем оно ценнее!" else "")
 end
 
 for index, display in ipairs(map.vaults) do
@@ -1441,6 +1444,7 @@ local function showGlow(player, entry)
     end
 end
 
+local glowFromX = LivingEgg.growsFrom(Rules.Vaults)
 do
     local elapsed = 0
     RunService.Heartbeat:Connect(function(dt)
@@ -1454,7 +1458,7 @@ do
             if entry.egg and entry.living and not entry.weekly then
                 local humanoid, root = characterParts(player)
                 if humanoid and humanoid.Health > 0 and root then
-                    entry.eggGlow = LivingEgg.grow(entry.eggGlow, step, root.Position.X, Rules.GateX)
+                    entry.eggGlow = LivingEgg.grow(entry.eggGlow, step, root.Position.X, glowFromX)
                     local stage = LivingEgg.stage(entry.eggGlow)
                     if stage ~= entry.eggStage then
                         entry.eggStage = stage

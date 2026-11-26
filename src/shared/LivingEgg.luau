@@ -1,5 +1,5 @@
 -- Living egg: an ordinary egg grows brighter and rarer the longer it is carried
--- outside the camp. Brighter eggs are slower, visible from afar and can be intercepted.
+-- on the far islands. Brighter eggs are slower, visible from afar and can be intercepted.
 local LivingEgg = {}
 
 LivingEgg.Stages = {
@@ -25,9 +25,14 @@ function LivingEgg.stage(seconds)
     return current
 end
 
--- The glow only grows outside the camp, so waiting next to the incubator gives nothing.
-function LivingEgg.grow(seconds, dt, x, gateX)
-    if x <= gateX then
+-- The glow only grows on the far islands and the bridges between them: east of
+-- the Meadow island. A Meadow egg can still glow if its carrier takes a detour.
+function LivingEgg.growsFrom(vaults)
+    return vaults[1].x + 20
+end
+
+function LivingEgg.grow(seconds, dt, x, fromX)
+    if x <= fromX then
         return seconds
     end
     return seconds + dt

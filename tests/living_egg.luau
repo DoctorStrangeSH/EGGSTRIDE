@@ -13,9 +13,11 @@ end
 -- The last stage must be reachable inside one run
 assert(LivingEgg.Stages[#LivingEgg.Stages].seconds < Rules.RunSeconds)
 
--- Glow grows only outside the camp
-assert(LivingEgg.grow(5, 0.2, Rules.GateX, Rules.GateX) == 5)
-assert(math.abs(LivingEgg.grow(5, 0.2, Rules.GateX + 1, Rules.GateX) - 5.2) < 1e-9)
+-- Glow grows only past the Meadow island
+local fromX = LivingEgg.growsFrom(Rules.Vaults)
+assert(fromX > Rules.Vaults[1].x and fromX < Rules.Vaults[2].x)
+assert(LivingEgg.grow(5, 0.2, Rules.Vaults[1].x, fromX) == 5, "Meadow island does not count")
+assert(math.abs(LivingEgg.grow(5, 0.2, Rules.Vaults[2].x, fromX) - 5.2) < 1e-9)
 
 -- Rewards
 assert(LivingEgg.coins(32, 1) == 32 and LivingEgg.coins(32, 2) == 40 and LivingEgg.coins(32, 4) == 64)
