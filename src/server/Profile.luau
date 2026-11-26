@@ -14,6 +14,10 @@ function Profile.new(startCoins)
     }
 end
 
+local function wholeNumber(value, low, high)
+    return type(value) == "number" and value >= low and value <= high and value % 1 == 0
+end
+
 local MAX_RECEIPTS = 50
 
 -- Base pets, slot count, paid timers and processed purchase receipts.
@@ -69,10 +73,6 @@ function Profile.rememberReceipt(entry, receiptId)
         table.remove(entry.receipts, 1)
     end
     return true
-end
-
-local function wholeNumber(value, low, high)
-    return type(value) == "number" and value >= low and value <= high and value % 1 == 0
 end
 
 local function readCounts(stored, definitions)
