@@ -7,7 +7,7 @@ function PlaytestReport.new(vaults, windEnabled)
     local biomes = {}
     for _, vault in ipairs(vaults) do
         biomes[vault.id] = {
-            pickups = 0, delivered = 0, timeout = 0, fall = 0, respawn = 0, left = 0,
+            pickups = 0, delivered = 0, timeout = 0, fall = 0, respawn = 0, left = 0, intercepted = 0,
             shortcutDeliveries = 0, prizePickups = 0, prizeDelivered = 0, prizeClaimMisses = 0,
             deliverySecondsTotal = 0, secondsLeftTotal = 0,
         }

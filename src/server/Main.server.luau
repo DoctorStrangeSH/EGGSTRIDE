@@ -1,4 +1,5 @@
 local MarketplaceService = game:GetService("MarketplaceService")
+local CollectionService = game:GetService("CollectionService")
 local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -21,6 +22,7 @@ local ProfileStore = require(script.Parent.ProfileStore)
 local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
 local PlaytestReport = require(script.Parent.PlaytestReport)
 local BaseService = require(script.Parent.BaseService)
+local LivingEgg = require(Shared.LivingEgg)
 
 local inStudio = RunService:IsStudio()
 local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
@@ -247,6 +249,7 @@ local function applySpeed(player, entry)
             humanoid.WalkSpeed = Rules.speed(Rules.Weekly.tier, entry.weekly.cargo ~= nil)
         else
             humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil or entry.stolen ~= nil) * (entry.windFactor or 1)
+                * (if entry.egg and entry.living then LivingEgg.speed(entry.eggStage) else 1)
         end
     end
 end
@@ -389,6 +392,16 @@ local function clearEgg(player, entry, outcome)
     entry.egg = nil
     entry.eggVault = nil
     entry.pickupAt = nil
+    entry.living = nil
+    entry.eggGlow = nil
+    entry.eggStage = nil
+    player:SetAttribute("EggStage", nil)
+    for _, field in ipairs({ "eggBeacon", "interceptPrompt" }) do
+        if entry[field] then
+            entry[field]:Destroy()
+            entry[field] = nil
+        end
+    end
     entry.abilityUsed = false
     entry.routeStage = 0
     entry.windFactor = nil
@@ -789,6 +802,39 @@ end
 
 local displayedWeek
 
+local function vaultIndexOf(vault)
+    for index, candidate in ipairs(Rules.Vaults) do
+        if candidate == vault then
+            return index
+        end
+    end
+    return 1
+end
+
+-- Pet for a living egg: brighter eggs roll better pools.
+local function livingHatch(vault, egg, stage)
+    local mode = LivingEgg.hatchMode(stage)
+    if mode == "rareEgg" then
+        return Loot.hatchForRoll(vault, { rarity = "rare", ability = egg.ability }, random:NextInteger(1, 10000))
+    elseif mode == "rarePet" then
+        local rares = {}
+        for _, pet in ipairs(vault.pets) do
+            if pet.rarity ~= "Обычный" then
+                table.insert(rares, pet)
+            end
+        end
+        return rares[random:NextInteger(1, #rares)]
+    elseif mode == "prize" then
+        local index = vaultIndexOf(vault)
+        for _, definition in ipairs(Rules.Prizes) do
+            if definition.vaultIndex == index then
+                return Loot.prizePetForRoll(definition.pets, random:NextInteger(1, 1000))
+            end
+        end
+    end
+    return Loot.hatchForRoll(vault, egg, random:NextInteger(1, 10000))
+end
+
 local function hatch(player, entry, root, secondsLeft, now, week)
     local egg = entry.egg
     local vault = entry.eggVault
@@ -814,12 +860,14 @@ local function hatch(player, entry, root, secondsLeft, now, week)
         playtest:finish(player, "delivered", now, secondsLeft, routeCompleted)
     end
     local catalystAwarded = Profile.awardCatalyst(entry, vault, entry.routeStage)
+    local glowStage = if entry.living then entry.eggStage else 1
     clearEgg(player, entry)
     entry.delivered = true
-    entry.coins += vault.coins + bonus
+    local runCoins = LivingEgg.coins(vault.coins, glowStage)
+    entry.coins += runCoins + bonus
     local pet = if awardedPrize then
         Loot.prizePetForRoll(definition.pets, random:NextInteger(1, 1000))
-        else Loot.hatchForRoll(vault, egg, random:NextInteger(1, 10000))
+        else livingHatch(vault, egg, glowStage)
     local prizeId = if awardedPrize then definition.id else nil
     local isNew, materialGain = Profile.recordHatch(entry, vault, pet, prizeId)
     local seasonChanged = Season.advance(entry, Rules.Season, week, "delivery")
@@ -850,7 +898,11 @@ local function hatch(player, entry, root, secondsLeft, now, week)
     end
     advanceOnboarding(player, entry, 3)
     publish(player, entry, "")
-    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, vault.coins + bonus, isNew,
+    if glowStage > 1 then
+        publish(player, entry, "%s принесло +%d%% монет.", translate(player, LivingEgg.Stages[glowStage].name),
+            math.round((LivingEgg.Stages[glowStage].coins - 1) * 100))
+    end
+    runFeedback:FireClient(player, "Hatch", pet.name, pet.rarity, runCoins + bonus, isNew,
         if unlockedTrail then Rules.StormTrial.name else nil, personalBest, bonus,
         if materialGain > 0 then vault.id else nil, if catalystAwarded then vault.name else nil, recordXP)
 end
@@ -1054,8 +1106,15 @@ local function pickUp(player, entry, root, vaultIndex, definition)
     end
     entry.eggVisual = accessory(root, "EggstrideEgg", World.VaultColors[vaultIndex],
         Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
+    -- Prize eggs already carry their own reward; only ordinary eggs come alive.
+    entry.living = definition == nil
+    entry.eggGlow = 0
+    entry.eggStage = 1
+    if entry.living then
+        player:SetAttribute("EggStage", 1)
+    end
     applySpeed(player, entry)
-    publish(player, entry, "")
+    publish(player, entry, if entry.living then "Чем дольше несёшь яйцо вне лагеря, тем оно ценнее!" else "")
 end
 
 for index, display in ipairs(map.vaults) do
@@ -1293,6 +1352,121 @@ equipPet.OnServerEvent:Connect(function(player, petId)
     end
     publish(player, entry, "Спутник выбран: %s.", translate(player, pet.name))
 end)
+
+-- Living egg: glow grows outside the camp, bright eggs can be intercepted.
+local function showGlow(player, entry)
+    local stage = LivingEgg.Stages[entry.eggStage]
+    local visual = entry.eggVisual
+    local _, root = characterParts(player)
+    if not visual or not root then
+        return
+    end
+    player:SetAttribute("EggStage", entry.eggStage)
+    local scale = 1 + (entry.eggStage - 1) * 0.12
+    visual.Size = Vector3.new(2.15, 2.7, 2.15) * scale
+    visual.Material = if entry.eggStage > 1 then Enum.Material.Neon else Enum.Material.SmoothPlastic
+    local light = visual:FindFirstChild("Glow")
+    if stage.light then
+        light = light or Instance.new("PointLight")
+        light.Name = "Glow"
+        light.Range = stage.light
+        light.Brightness = 2
+        light.Color = visual.Color
+        light.Parent = visual
+    end
+    if stage.beacon and not entry.eggBeacon then
+        local beacon = Instance.new("Part")
+        beacon.Name = "EggstrideBeacon"
+        beacon.Size = Vector3.new(0.8, 70, 0.8)
+        beacon.Color = visual.Color
+        beacon.Material = Enum.Material.Neon
+        beacon.Transparency = 0.45
+        beacon.CanCollide = false
+        beacon.CanTouch = false
+        beacon.CanQuery = false
+        beacon.Massless = true
+        beacon.CastShadow = false
+        beacon.CFrame = root.CFrame * CFrame.new(0, 38, 0)
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = root
+        weld.Part1 = beacon
+        weld.Parent = beacon
+        beacon.Parent = root
+        entry.eggBeacon = beacon
+    end
+    if entry.eggStage >= LivingEgg.InterceptStage and not entry.interceptPrompt then
+        local prompt = Instance.new("ProximityPrompt")
+        prompt.Name = "Intercept"
+        prompt.ActionText = "Перехватить"
+        prompt.HoldDuration = LivingEgg.InterceptHoldSeconds
+        prompt.MaxActivationDistance = LivingEgg.InterceptRadius
+        prompt.RequiresLineOfSight = false
+        prompt:SetAttribute("CarrierUserId", player.UserId)
+        CollectionService:AddTag(prompt, "EggstrideInterceptPrompt")
+        prompt.Parent = root
+        entry.interceptPrompt = prompt
+        prompt.Triggered:Connect(function(interceptor)
+            local thiefEntry = entries[interceptor]
+            local carrierEntry = entries[player]
+            local humanoid, thiefRoot = characterParts(interceptor)
+            local _, carrierRoot = characterParts(player)
+            if interceptor == player or closing or not thiefEntry or not carrierEntry or carrierEntry ~= entry
+                or not entry.living or entry.interceptPrompt ~= prompt or thiefEntry.weekly or thiefEntry.stolen
+                or ProfileStore.expired(thiefEntry.session) or not humanoid or humanoid.Health <= 0
+                or not thiefRoot or not carrierRoot
+                or (thiefRoot.Position - carrierRoot.Position).Magnitude > LivingEgg.InterceptRadius + 2 then
+                return
+            end
+            local open, _, now = syncRound()
+            if not Rules.canCollect(thiefEntry.egg ~= nil, open, thiefEntry.delivered) then
+                return
+            end
+            local egg, vault, glow = entry.egg, entry.eggVault, entry.eggGlow
+            clearEgg(player, entry, "intercepted")
+            publish(player, entry, "%s перехватил твоё яйцо!", interceptor.DisplayName)
+            runFeedback:FireClient(player, "Fall")
+
+            thiefEntry.egg = egg
+            thiefEntry.eggVault = vault
+            thiefEntry.pickupAt = now
+            thiefEntry.living = true
+            thiefEntry.eggGlow = LivingEgg.afterIntercept(glow)
+            thiefEntry.eggStage = LivingEgg.stage(thiefEntry.eggGlow)
+            thiefEntry.eggVisual = accessory(thiefRoot, "EggstrideEgg", World.VaultColors[vaultIndexOf(vault)],
+                Vector3.new(2.15, 2.7, 2.15), Vector3.new(0, 0.65, -1.8))
+            showGlow(interceptor, thiefEntry)
+            applySpeed(interceptor, thiefEntry)
+            publish(interceptor, thiefEntry, "Перехват! Неси яйцо к инкубатору.")
+        end)
+    end
+end
+
+do
+    local elapsed = 0
+    RunService.Heartbeat:Connect(function(dt)
+        elapsed += dt
+        if elapsed < 0.2 then
+            return
+        end
+        local step = elapsed
+        elapsed = 0
+        for player, entry in pairs(entries) do
+            if entry.egg and entry.living and not entry.weekly then
+                local humanoid, root = characterParts(player)
+                if humanoid and humanoid.Health > 0 and root then
+                    entry.eggGlow = LivingEgg.grow(entry.eggGlow, step, root.Position.X, Rules.GateX)
+                    local stage = LivingEgg.stage(entry.eggGlow)
+                    if stage ~= entry.eggStage then
+                        entry.eggStage = stage
+                        showGlow(player, entry)
+                        applySpeed(player, entry)
+                        publish(player, entry, "Яйцо разгорается: %s!", translate(player, LivingEgg.Stages[stage].name))
+                    end
+                end
+            end
+        end
+    end)
+end
 
 syncRound()
 

@@ -1,6 +1,7 @@
 -- Server side of player bases: plot assignment, passive income, stealing,
 -- base lock, slot upgrades and Developer Products (shield, double income).
 local MarketplaceService = game:GetService("MarketplaceService")
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -140,8 +141,10 @@ function BaseService.new(parent, deps)
                 carry.victim:SetAttribute("BaseRobbed", nil)
             end
         end
-        if carry.visual then
-            carry.visual:Destroy()
+        for _, field in ipairs({ "visual", "highlight", "tag" }) do
+            if carry[field] then
+                carry[field]:Destroy()
+            end
         end
         thief:SetAttribute("CarryingStolen", nil)
         deps.applySpeed(thief, entry)
@@ -303,7 +306,34 @@ function BaseService.new(parent, deps)
         weld.Parent = visual
         visual.Parent = thief.Character
 
-        thiefEntry.stolen = { victim = victim, slot = slot, petId = id, visual = visual }
+        -- Everyone sees the thief: red outline and a bounty tag.
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "EggstrideThief"
+        highlight.FillColor = Color3.fromRGB(230, 60, 80)
+        highlight.OutlineColor = Color3.fromRGB(255, 220, 220)
+        highlight.FillTransparency = 0.6
+        highlight.Parent = thief.Character
+        local tag = Instance.new("BillboardGui")
+        tag.Name = "EggstrideBounty"
+        tag.Size = UDim2.fromOffset(170, 34)
+        tag.StudsOffsetWorldSpace = Vector3.new(0, 6, 0)
+        tag.AlwaysOnTop = true
+        tag.MaxDistance = 150
+        tag.LightInfluence = 0
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.fromScale(1, 1)
+        label.BackgroundColor3 = Color3.fromRGB(200, 50, 70)
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Font = Enum.Font.GothamBold
+        label.TextScaled = true
+        label.AutoLocalize = false
+        label:SetAttribute("Bounty", Bases.bounty(pet))
+        CollectionService:AddTag(label, "EggstrideBountySign")
+        label.Parent = tag
+        Instance.new("UICorner", label).CornerRadius = UDim.new(0, 6)
+        tag.Parent = root
+        thiefEntry.stolen = { victim = victim, slot = slot, petId = id, visual = visual, highlight = highlight, tag = tag,
+            catchableAt = os.clock() + Bases.CatchGraceSeconds }
         victimEntry.beingStolen[thief] = slot
         thief:SetAttribute("CarryingStolen", pet.name)
         victim:SetAttribute("BaseRobbed", thief.DisplayName)
@@ -444,6 +474,25 @@ function BaseService.new(parent, deps)
         end
     end
 
+    -- The owner has priority; any other free player can catch the thief for the bounty.
+    local function findCatcher(thief, thiefRoot)
+        local carry = entries[thief].stolen
+        local best
+        for other, otherEntry in pairs(entries) do
+            if other ~= thief and not otherEntry.stolen and not otherEntry.weekly then
+                local humanoid, root = deps.characterParts(other)
+                if humanoid and humanoid.Health > 0 and root
+                    and (root.Position - thiefRoot.Position).Magnitude <= Bases.CatchRadius then
+                    if other == carry.victim then
+                        return other
+                    end
+                    best = best or other
+                end
+            end
+        end
+        return best
+    end
+
     -- Income, catching thieves and deliveries.
     local last = os.clock()
     RunService.Heartbeat:Connect(function()
@@ -469,13 +518,29 @@ function BaseService.new(parent, deps)
                 if carry then
                     local humanoid, root = deps.characterParts(player)
                     local victimEntry = entries[carry.victim]
-                    local _, victimRoot = deps.characterParts(carry.victim)
                     if not victimEntry or not humanoid or humanoid.Health <= 0 or not root then
                         clearCarry(player, entry)
-                    elseif victimRoot and (victimRoot.Position - root.Position).Magnitude <= Bases.CatchRadius then
-                        self.dropStolen(player, entry, "Хозяин догнал тебя и забрал питомца!")
-                    elseif nearPlot(root, plot, Bases.DeliverRadius) then
-                        deliver(player, entry)
+                    else
+                        local catcher = if os.clock() >= carry.catchableAt then findCatcher(player, root) else nil
+                        if catcher == carry.victim then
+                            self.dropStolen(player, entry, "Хозяин догнал тебя и забрал питомца!")
+                        elseif catcher then
+                            local pet = catalog[carry.petId]
+                            local reward = Bases.bounty(pet)
+                            local catcherEntry = entries[catcher]
+                            self.dropStolen(player, entry, "Тебя поймали! Питомец вернулся хозяину.")
+                            -- Cooldown stops two friends from farming bounties off each other.
+                            if os.clock() >= (catcherEntry.nextBountyAt or 0) then
+                                catcherEntry.nextBountyAt = os.clock() + Bases.BountyCooldownSeconds
+                                catcherEntry.coins += reward
+                                publish(catcher, catcherEntry, "Вор пойман! Награда: %d монет.", reward)
+                            else
+                                publish(catcher, catcherEntry, "Вор пойман! Награду можно получать раз в минуту.")
+                            end
+                            publish(carry.victim, victimEntry, "%s поймал вора и вернул твоего питомца!", catcher.DisplayName)
+                        elseif nearPlot(root, plot, Bases.DeliverRadius) then
+                            deliver(player, entry)
+                        end
                     end
                 end
             end

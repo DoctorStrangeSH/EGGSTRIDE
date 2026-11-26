@@ -50,6 +50,16 @@ function Bases.totalIncome(base, catalog, boosted)
     return if boosted then total * 2 else total
 end
 
+-- Reward for anyone but the owner who catches a thief carrying this pet.
+Bases.BountyMinutes = 2
+Bases.MinBounty = 20
+Bases.BountyCooldownSeconds = 60
+-- Nobody can catch the thief in the first moment after the steal.
+Bases.CatchGraceSeconds = 1
+function Bases.bounty(pet)
+    return math.max(Bases.MinBounty, Bases.income(pet) * Bases.BountyMinutes)
+end
+
 function Bases.sellPrice(pet)
     return Bases.income(pet) * Bases.SellMinutes
 end

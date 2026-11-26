@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Bases = require(Shared:WaitForChild("Bases"))
+local LivingEgg = require(Shared:WaitForChild("LivingEgg"))
 local locale = require(script.Parent.InterfaceLanguage)
 local text = locale.text
 
@@ -85,6 +86,27 @@ for _, tag in ipairs({ "EggstrideOwnerOnly", "EggstrideStealPrompt" }) do
     end
 end
 
+-- Interception prompts hang on carriers: hide your own, translate the rest.
+local function watchIntercept(prompt)
+    prompt.ActionText = text("Перехватить")
+    prompt.ObjectText = text("Сияющее яйцо")
+    if prompt:GetAttribute("CarrierUserId") == player.UserId then
+        prompt.Enabled = false
+    end
+end
+CollectionService:GetInstanceAddedSignal("EggstrideInterceptPrompt"):Connect(watchIntercept)
+for _, prompt in ipairs(CollectionService:GetTagged("EggstrideInterceptPrompt")) do
+    watchIntercept(prompt)
+end
+
+local function watchBounty(label)
+    label.Text = text("Вор! Награда %d", label:GetAttribute("Bounty") or 0)
+end
+CollectionService:GetInstanceAddedSignal("EggstrideBountySign"):Connect(watchBounty)
+for _, label in ipairs(CollectionService:GetTagged("EggstrideBountySign")) do
+    watchBounty(label)
+end
+
 -- Robbery alert and product buttons.
 local gui = Instance.new("ScreenGui")
 gui.Name = "EggstrideBases"
@@ -118,6 +140,27 @@ local function updateAlerts()
     carrying.Visible = pet ~= nil
     carrying.Text = if pet then text("Неси %s на свою базу!", text(pet)) else ""
 end
+local glow = alert:Clone()
+glow.Name = "EggGlow"
+glow.Position = UDim2.new(0.5, 0, 0, 110)
+glow.Size = UDim2.fromOffset(260, 32)
+glow.BackgroundColor3 = Color3.fromRGB(240, 170, 50)
+glow.Parent = gui
+
+local function updateGlow()
+    local stage = player:GetAttribute("EggStage")
+    local definition = stage and LivingEgg.Stages[stage]
+    glow.Visible = definition ~= nil
+    if definition then
+        local nextStage = LivingEgg.Stages[stage + 1]
+        glow.Text = text(definition.name) .. "  ·  ×" .. tostring(definition.coins)
+            .. (if nextStage then "" else "  ·  " .. text("Максимум!"))
+        glow.BackgroundColor3 = Color3.fromRGB(240, 170, 50):Lerp(Color3.fromRGB(255, 90, 200), (stage - 1) / 3)
+    end
+end
+player:GetAttributeChangedSignal("EggStage"):Connect(updateGlow)
+updateGlow()
+
 player:GetAttributeChangedSignal("BaseRobbed"):Connect(updateAlerts)
 player:GetAttributeChangedSignal("CarryingStolen"):Connect(updateAlerts)
 updateAlerts()
