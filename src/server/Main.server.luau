@@ -25,6 +25,7 @@ local BaseService = require(script.Parent.BaseService)
 local LivingEgg = require(Shared.LivingEgg)
 local GlideService = require(script.Parent.GlideService)
 local StormService = require(script.Parent.StormService)
+local Rebirth = require(Shared.Rebirth)
 
 local inStudio = RunService:IsStudio()
 local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
@@ -501,6 +502,8 @@ local storm = StormService.new({
     end,
 })
 
+bases.setProductHandler("storm", storm.summon)
+
 local function join(player)
     if closing or player.Parent ~= Players or entries[player] or loading[player] then
         return
@@ -885,7 +888,7 @@ local function hatch(player, entry, root, secondsLeft, now, week)
     local glowStage = if entry.living then entry.eggStage else 1
     clearEgg(player, entry)
     entry.delivered = true
-    local runCoins = LivingEgg.coins(vault.coins, glowStage)
+    local runCoins = math.floor(LivingEgg.coins(vault.coins, glowStage) * Rebirth.runCoinMultiplier(entry.rebirths))
     entry.coins += runCoins + bonus
     local pet = if awardedPrize then
         Loot.prizePetForRoll(definition.pets, random:NextInteger(1, 1000))

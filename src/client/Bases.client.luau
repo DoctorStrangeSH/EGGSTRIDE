@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Bases = require(Shared:WaitForChild("Bases"))
 local LivingEgg = require(Shared:WaitForChild("LivingEgg"))
+local Rebirth = require(Shared:WaitForChild("Rebirth"))
 local locale = require(script.Parent.InterfaceLanguage)
 local text = locale.text
 
@@ -107,6 +108,35 @@ for _, label in ipairs(CollectionService:GetTagged("EggstrideBountySign")) do
     watchBounty(label)
 end
 
+-- Rebirth station text follows coins and rebirths.
+local rebirthPrompts = {}
+local function updateRebirth()
+    local rebirths = player:GetAttribute("Rebirths") or 0
+    local coins = player:GetAttribute("Coins") or 0
+    local cost = Rebirth.cost(rebirths)
+    for prompt in pairs(rebirthPrompts) do
+        if not cost then
+            prompt.ObjectText = text("Перерождение")
+            prompt.ActionText = text("Достигнут максимум перерождений.")
+        else
+            prompt.ObjectText = text("Доход ×%s → ×%s", tostring(Rebirth.incomeMultiplier(rebirths)),
+                tostring(Rebirth.incomeMultiplier(rebirths + 1)))
+            prompt.ActionText = if coins >= cost then text("Переродиться · %d монет", cost)
+                else text("%d монет · не хватает %d", cost, cost - coins)
+        end
+    end
+end
+local function watchRebirth(prompt)
+    rebirthPrompts[prompt] = true
+    updateRebirth()
+end
+CollectionService:GetInstanceAddedSignal("EggstrideRebirthPrompt"):Connect(watchRebirth)
+for _, prompt in ipairs(CollectionService:GetTagged("EggstrideRebirthPrompt")) do
+    watchRebirth(prompt)
+end
+player:GetAttributeChangedSignal("Rebirths"):Connect(updateRebirth)
+player:GetAttributeChangedSignal("Coins"):Connect(updateRebirth)
+
 -- Robbery alert and product buttons.
 local gui = Instance.new("ScreenGui")
 gui.Name = "EggstrideBases"
@@ -169,7 +199,7 @@ local shop = Instance.new("Frame")
 shop.Name = "BaseProducts"
 shop.AnchorPoint = Vector2.new(0, 1)
 shop.Position = UDim2.new(0, 12, 1, -12)
-shop.Size = UDim2.fromOffset(150, 84)
+shop.Size = UDim2.fromOffset(150, 126)
 shop.BackgroundTransparency = 1
 shop.Visible = false
 shop.Parent = gui
@@ -194,7 +224,8 @@ for index, key in ipairs(Bases.ProductOrder) do
     button.Name = key
     button.LayoutOrder = index
     button.Size = UDim2.fromOffset(150, 38)
-    button.BackgroundColor3 = if key == "shield" then Color3.fromRGB(80, 150, 230) else Color3.fromRGB(240, 170, 50)
+    button.BackgroundColor3 = if key == "shield" then Color3.fromRGB(80, 150, 230)
+        elseif key == "storm" then Color3.fromRGB(130, 80, 220) else Color3.fromRGB(240, 170, 50)
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Font = Enum.Font.GothamBold
     button.TextScaled = true

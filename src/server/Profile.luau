@@ -10,7 +10,7 @@ function Profile.new(startCoins)
         equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
         muteRunSounds = false, reduceCardMotion = false,
         deliveries = {}, prizeWins = {}, materials = {}, discoveries = {}, catalysts = {},
-        base = {}, baseSlots = 4, shieldUntil = 0, incomeBoostUntil = 0, receipts = {},
+        base = {}, baseSlots = 4, shieldUntil = 0, incomeBoostUntil = 0, receipts = {}, rebirths = 0,
     }
 end
 
@@ -36,6 +36,9 @@ local function readBase(stored, record, catalog, rules)
                 table.insert(record.base, id)
             end
         end
+    end
+    if wholeNumber(stored.rebirths, 0, 100) then
+        record.rebirths = stored.rebirths
     end
     for _, field in ipairs({ "shieldUntil", "incomeBoostUntil" }) do
         if wholeNumber(stored[field], 0, 9e15) then
@@ -322,6 +325,7 @@ function Profile.snapshot(entry)
         record.shieldUntil = entry.shieldUntil or 0
         record.incomeBoostUntil = entry.incomeBoostUntil or 0
         record.receipts = table.clone(entry.receipts)
+        record.rebirths = entry.rebirths or 0
     end
     return record
 end

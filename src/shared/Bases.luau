@@ -31,8 +31,9 @@ Bases.DeliverRadius = 12
 Bases.Products = {
     shield = { id = "shield", name = "Щит базы", description = "Базу нельзя ограбить 10 минут", seconds = 600 },
     income = { id = "income", name = "Доход ×2", description = "Двойной доход базы 15 минут", seconds = 900 },
+    storm = { id = "storm", name = "Вызвать шторм", description = "Небесный шторм для всего сервера в следующем раунде" },
 }
-Bases.ProductOrder = { "shield", "income" }
+Bases.ProductOrder = { "shield", "income", "storm" }
 
 function Bases.income(pet)
     return Bases.IncomePerMinute[pet.rarity] or Bases.IncomePerMinute["Обычный"]

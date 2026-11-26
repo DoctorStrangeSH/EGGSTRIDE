@@ -43,10 +43,14 @@ local function update()
     elseif state == "active" and spot then
         message = text("Золотое яйцо над %s! Лети через поток", text(spot))
     end
+    local summoner = Shared:GetAttribute("StormSummoner")
+    if message and summoner then
+        message = text("Шторм от %s · ", summoner) .. message
+    end
     banner.Visible = message ~= nil
     banner.Text = message or ""
 end
-for _, name in ipairs({ "StormState", "StormSpot", "StormCarrier" }) do
+for _, name in ipairs({ "StormState", "StormSpot", "StormCarrier", "StormSummoner" }) do
     Shared:GetAttributeChangedSignal(name):Connect(update)
 end
 update()

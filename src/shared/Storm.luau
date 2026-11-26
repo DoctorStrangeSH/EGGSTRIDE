@@ -31,16 +31,30 @@ function Storm.isStormRound(cycle)
     return cycle >= Storm.FirstRound and (cycle - Storm.FirstRound) % Storm.EveryRounds == 0
 end
 
+-- forced: optional set of extra storm rounds bought by players (cycle -> true).
+local function stormRound(cycle, forced)
+    return Storm.isStormRound(cycle) or (forced ~= nil and forced[cycle] ~= nil)
+end
+
 -- "next" during the round before a storm, "warning" while the storm round prepares,
 -- "active" while its gates are open.
-function Storm.state(cycle, open)
-    if Storm.isStormRound(cycle) then
+function Storm.state(cycle, open, forced)
+    if stormRound(cycle, forced) then
         return if open then "active" else "warning"
     end
-    if open and Storm.isStormRound(cycle + 1) then
+    if open and stormRound(cycle + 1, forced) then
         return "next"
     end
     return nil
+end
+
+-- First round after the current one that is not already a storm.
+function Storm.nextFreeRound(cycle, forced)
+    local candidate = cycle + 1
+    while stormRound(candidate, forced) do
+        candidate += 1
+    end
+    return candidate
 end
 
 function Storm.spotForRoll(roll)

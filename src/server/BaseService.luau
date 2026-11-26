@@ -7,6 +7,8 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Bases = require(Shared.Bases)
+local Rebirth = require(Shared.Rebirth)
+local Rules = require(Shared.Rules)
 local BaseWorld = require(script.Parent.BaseWorld)
 
 local BaseService = {}
@@ -60,13 +62,22 @@ function BaseService.new(parent, deps)
         return (entry.incomeBoostUntil or 0) > os.time()
     end
 
+    local function incomeOf(entry)
+        return math.floor(Bases.totalIncome(entry.base, catalog, boosted(entry)) * Rebirth.incomeMultiplier(entry.rebirths))
+    end
+
+    local productHandlers = {}
+    function self.setProductHandler(key, handler)
+        productHandlers[key] = handler
+    end
+
     local function refreshPlot(player, entry)
         local plot = plotOf(entry)
         if not plot then
             return
         end
         local model = plot.model
-        local perMinute = Bases.totalIncome(entry.base, catalog, boosted(entry))
+        local perMinute = incomeOf(entry)
         model:SetAttribute("OwnerUserId", player.UserId)
         model:SetAttribute("OwnerName", player.DisplayName)
         model:SetAttribute("Income", perMinute)
@@ -175,6 +186,22 @@ function BaseService.new(parent, deps)
         entry.shieldUntil = record.shieldUntil
         entry.incomeBoostUntil = record.incomeBoostUntil
         entry.receipts = record.receipts
+        entry.rebirths = record.rebirths or 0
+        player:SetAttribute("Rebirths", entry.rebirths)
+        -- Roblox player list: coins and rebirths.
+        local stats = Instance.new("Folder")
+        stats.Name = "leaderstats"
+        local coins = Instance.new("IntValue")
+        coins.Name = "Монеты"
+        coins.Value = entry.coins
+        coins.Parent = stats
+        local rebirths = Instance.new("IntValue")
+        rebirths.Name = "Перерождения"
+        rebirths.Value = entry.rebirths
+        rebirths.Parent = stats
+        stats.Parent = player
+        entry.leaderCoins = coins
+        entry.leaderRebirths = rebirths
         entry.pending = 0
         entry.beingStolen = {}
         entry.lockedUntil = now() + Bases.JoinProtectionSeconds
@@ -380,11 +407,67 @@ function BaseService.new(parent, deps)
 
     local function grant(player, entry, key)
         local product = Bases.Products[key]
+        if productHandlers[key] then
+            productHandlers[key](player, entry)
+            return
+        end
         local field = if key == "shield" then "shieldUntil" else "incomeBoostUntil"
         entry[field] = math.max(entry[field] or 0, os.time()) + product.seconds
         refreshPlot(player, entry)
         publish(player, entry, "%s включён.", translate(player, product.name))
     end
+
+    -- Rebirth station in the camp.
+    local station = Instance.new("Part")
+    station.Name = "Перерождение"
+    station.Size = Vector3.new(6, 0.6, 6)
+    station.Position = Vector3.new(-8, 0.3, -11)
+    station.Color = Color3.fromRGB(255, 120, 200)
+    station.Material = Enum.Material.Neon
+    station.Anchored = true
+    station.Parent = parent
+    local rebirthPrompt = Instance.new("ProximityPrompt")
+    rebirthPrompt.Name = "Rebirth"
+    rebirthPrompt.ActionText = "Перерождение"
+    rebirthPrompt.HoldDuration = 2
+    rebirthPrompt.MaxActivationDistance = 9
+    rebirthPrompt.RequiresLineOfSight = false
+    CollectionService:AddTag(rebirthPrompt, "EggstrideRebirthPrompt")
+    rebirthPrompt.Parent = station
+    rebirthPrompt.Triggered:Connect(function(player)
+        local entry = entries[player]
+        local _, root = deps.characterParts(player)
+        if not ready(entry) or not root or (root.Position - station.Position).Magnitude > 12 then
+            return
+        end
+        if next(entry.beingStolen) then
+            publish(player, entry, "Сейчас нельзя: у тебя крадут питомца!")
+            return
+        end
+        local ok, reason = Rebirth.apply(entry, Rules.StartCoins, Bases.MaxSlots)
+        if not ok then
+            if reason == "coins" then
+                local cost = Rebirth.cost(entry.rebirths)
+                publish(player, entry, "Перерождение стоит %d монет. Не хватает %d.", cost, cost - entry.coins)
+            elseif reason == "busy" then
+                publish(player, entry, "Руки заняты: сначала донеси груз.")
+            else
+                publish(player, entry, "Достигнут максимум перерождений.")
+            end
+            return
+        end
+        entry.pending = 0
+        player:SetAttribute("Rebirths", entry.rebirths)
+        refreshPlot(player, entry)
+        deps.applySpeed(player, entry)
+        publish(player, entry, "Перерождение %d! Доход ×%s навсегда.", entry.rebirths,
+            tostring(Rebirth.incomeMultiplier(entry.rebirths)))
+        for other, otherEntry in pairs(entries) do
+            if other ~= player then
+                publish(other, otherEntry, "%s переродился! Перерождений: %d.", player.DisplayName, entry.rebirths)
+            end
+        end
+    end)
 
     -- Wire up plot prompts.
     for index, plot in ipairs(plots) do
@@ -508,8 +591,12 @@ function BaseService.new(parent, deps)
         end
         last = clock
         for player, entry in pairs(entries) do
+            if entry.leaderCoins then
+                entry.leaderCoins.Value = math.min(entry.coins, 2 ^ 31 - 1)
+                entry.leaderRebirths.Value = entry.rebirths or 0
+            end
             if entry.base and entry.plot then
-                local perMinute = Bases.totalIncome(entry.base, catalog, boosted(entry))
+                local perMinute = incomeOf(entry)
                 local before = math.floor(entry.pending)
                 entry.pending = Bases.accrue(entry.pending, perMinute, dt)
                 local plot = plotOf(entry)

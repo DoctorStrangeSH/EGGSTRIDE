@@ -61,7 +61,9 @@ function StormService.new(deps)
         OutdoorAmbient = Color3.fromRGB(80, 78, 120),
     }
 
-    local state -- nil, "next", "warning", "active"
+    local state -- nil, "next", "warning", "active", "done"
+    local forced = {} -- cycle -> name of the player who bought the storm
+    local currentCycle = 0
     local spot
     local egg, eggPrompt, updraft
     local carrier
@@ -70,6 +72,8 @@ function StormService.new(deps)
         Shared:SetAttribute("StormState", state)
         Shared:SetAttribute("StormSpot", spot and spot.label or nil)
         Shared:SetAttribute("StormCarrier", carrier and carrier.DisplayName or nil)
+        local summoner = forced[currentCycle] or (state == "next" and forced[currentCycle + 1]) or nil
+        Shared:SetAttribute("StormSummoner", summoner)
     end
 
     local function removeWorld()
@@ -241,6 +245,19 @@ function StormService.new(deps)
         end
     end
 
+    -- Paid storm: the next free round becomes a storm round.
+    function self.summon(player, entry)
+        local round = Storm.nextFreeRound(currentCycle, forced)
+        forced[round] = player.DisplayName
+        setShared()
+        deps.publish(player, entry, "Шторм вызван! Он начнётся через %d раунд(а).", round - currentCycle)
+        for other, otherEntry in pairs(entries) do
+            if other ~= player then
+                deps.publish(other, otherEntry, "%s вызвал небесный шторм!", player.DisplayName)
+            end
+        end
+    end
+
     function self.drop(player, message)
         if carrier == player then
             clearCarrier(message)
@@ -284,7 +301,11 @@ function StormService.new(deps)
         local passed = workspace:GetServerTimeNow() - deps.startedAt
         local cycle = math.floor(passed / (Rules.PrepareSeconds + Rules.RunSeconds))
         local open = Rules.clock(passed)
-        local upcoming = Storm.state(cycle, open)
+        if cycle ~= currentCycle then
+            forced[currentCycle] = nil
+            currentCycle = cycle
+        end
+        local upcoming = Storm.state(cycle, open, forced)
         if state == "done" and upcoming == "active" then
             upcoming = "done"
         end
