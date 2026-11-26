@@ -229,6 +229,7 @@ local function update()
     local ability = Rules.Abilities[abilityId]
     local tier = player:GetAttribute("SpeedTier") or 1
     stats.Text = text("Монеты %d  ·  Скорость %d/%d", player:GetAttribute("Coins") or 0, tier, #Rules.Speeds)
+        .. "  ·  " .. text("База +%d/мин", player:GetAttribute("BaseIncome") or 0)
     local prizeStatus = if Rules.canUseVault(tier, Rules.Vaults[3]) then round:GetAttribute("PrizeStatus_storm_" .. locale.language)
         elseif Rules.canUseVault(tier, Rules.Vaults[2]) then round:GetAttribute("PrizeStatus_amber_" .. locale.language)
         else round:GetAttribute("PrizeStatus_meadow_" .. locale.language) or text("Луговое яйцо доступно каждому")
@@ -275,7 +276,7 @@ local function update()
     updateNotice()
 end
 
-for _, name in ipairs({ "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "EggReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
+for _, name in ipairs({ "BaseIncome", "OnboardingStep", "Coins", "SpeedTier", "CarryingEgg", "EggAbility", "EggReturnTarget", "Delivered", "WeeklyStep", "WeeklyStartsAt" }) do
     player:GetAttributeChangedSignal(name):Connect(update)
 end
 for _, name in ipairs({ "Notice", "NoticeUntil", "WindEffect", "WeeklySplitText" }) do

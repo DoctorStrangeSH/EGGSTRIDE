@@ -10,7 +10,62 @@ function Profile.new(startCoins)
         equipped = nil, onboarding = 0, stormTrailUnlocked = false, deliveryRecords = {},
         muteRunSounds = false, reduceCardMotion = false,
         deliveries = {}, prizeWins = {}, materials = {}, discoveries = {}, catalysts = {},
+        base = {}, baseSlots = 4, shieldUntil = 0, incomeBoostUntil = 0, receipts = {},
     }
+end
+
+local MAX_RECEIPTS = 50
+
+-- Base pets, slot count, paid timers and processed purchase receipts.
+local function readBase(stored, record, catalog, rules)
+    local bases = rules.Bases
+    if not bases then
+        return
+    end
+    if wholeNumber(stored.baseSlots, bases.StartSlots, bases.MaxSlots) then
+        record.baseSlots = stored.baseSlots
+    else
+        record.baseSlots = bases.StartSlots
+    end
+    if type(stored.base) == "table" then
+        for _, id in ipairs(stored.base) do
+            if #record.base >= record.baseSlots then
+                break
+            end
+            if type(id) == "string" and catalog[id] then
+                table.insert(record.base, id)
+            end
+        end
+    end
+    for _, field in ipairs({ "shieldUntil", "incomeBoostUntil" }) do
+        if wholeNumber(stored[field], 0, 9e15) then
+            record[field] = stored[field]
+        end
+    end
+    if type(stored.receipts) == "table" then
+        for _, id in ipairs(stored.receipts) do
+            if #record.receipts >= MAX_RECEIPTS then
+                break
+            end
+            if type(id) == "string" and #id <= 64 then
+                table.insert(record.receipts, id)
+            end
+        end
+    end
+end
+
+-- Remembers a processed receipt so a retried purchase is never granted twice.
+function Profile.rememberReceipt(entry, receiptId)
+    for _, id in ipairs(entry.receipts) do
+        if id == receiptId then
+            return false
+        end
+    end
+    table.insert(entry.receipts, receiptId)
+    while #entry.receipts > MAX_RECEIPTS do
+        table.remove(entry.receipts, 1)
+    end
+    return true
 end
 
 local function wholeNumber(value, low, high)
@@ -222,6 +277,7 @@ function Profile.read(stored, catalog, rules)
     else
         record.equipped = next(record.owned)
     end
+    readBase(stored, record, catalog, rules)
     if wholeNumber(stored.onboarding, 0, 4) then
         record.onboarding = stored.onboarding
     elseif next(record.owned) then
@@ -260,6 +316,13 @@ function Profile.snapshot(entry)
         record.owned[id] = true
     end
     record.equipped = entry.pet and entry.pet.id or nil
+    if entry.base then
+        record.base = table.clone(entry.base)
+        record.baseSlots = entry.baseSlots
+        record.shieldUntil = entry.shieldUntil or 0
+        record.incomeBoostUntil = entry.incomeBoostUntil or 0
+        record.receipts = table.clone(entry.receipts)
+    end
     return record
 end
 

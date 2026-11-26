@@ -7,6 +7,8 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Eggstride")
 local Rules = require(Shared.Rules)
+-- Profile.read validates base slots against these limits.
+Rules.Bases = require(Shared.Bases)
 local Locale = require(Shared.Locale)
 local World = require(script.Parent.World)
 local Loot = require(script.Parent.Loot)
@@ -18,6 +20,7 @@ local Profile = require(script.Parent.Profile)
 local ProfileStore = require(script.Parent.ProfileStore)
 local WeeklyLeaderboard = require(script.Parent.WeeklyLeaderboard)
 local PlaytestReport = require(script.Parent.PlaytestReport)
+local BaseService = require(script.Parent.BaseService)
 
 local inStudio = RunService:IsStudio()
 local studioLanguage = inStudio and workspace:GetAttribute("StudioLanguage")
@@ -75,6 +78,9 @@ workspace:CollisionGroupSetCollidable(weeklyGroup, weeklyGroup, false)
 
 local map = World.build(Rules)
 local startedAt = workspace:GetServerTimeNow()
+local closing = false
+local entries = {}
+local bases
 local round = Instance.new("Folder")
 round.Name = "Round"
 round:SetAttribute("StartedAt", startedAt)
@@ -131,9 +137,7 @@ local preferences = {
     ReduceCardMotion = "reduceCardMotion",
 }
 
-local entries = {}
 local loading = {}
-local closing = false
 local pending = 0
 local prizes = {}
 
@@ -219,6 +223,7 @@ local function leave(player)
         playtest:leave(player)
     end
     releasePrize(player, entry)
+    bases.leave(player, entry)
     pending += 1
     local ok, reason = ProfileStore.save(entry.session, Profile.snapshot(entry), true)
     pending -= 1
@@ -241,7 +246,7 @@ local function applySpeed(player, entry)
         if entry.weekly then
             humanoid.WalkSpeed = Rules.speed(Rules.Weekly.tier, entry.weekly.cargo ~= nil)
         else
-            humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil) * (entry.windFactor or 1)
+            humanoid.WalkSpeed = Rules.speed(entry.tier, entry.egg ~= nil or entry.stolen ~= nil) * (entry.windFactor or 1)
         end
     end
 end
@@ -439,6 +444,30 @@ local cosmeticShop = CosmeticShop.start(cosmetics, Shared, MarketplaceService, i
     return nil
 end)
 
+bases = BaseService.new(workspace, {
+    entries = entries,
+    catalog = petCatalog,
+    publish = publish,
+    translate = translate,
+    characterParts = characterParts,
+    applySpeed = applySpeed,
+    Profile = Profile,
+    inStudio = inStudio,
+    isClosing = function()
+        return closing
+    end,
+    expired = function(session)
+        return ProfileStore.expired(session)
+    end,
+    save = function(entry)
+        -- A busy session skips the write, so wait for a real one before granting a purchase.
+        while entry.session.busy do
+            task.wait()
+        end
+        return ProfileStore.save(entry.session, Profile.snapshot(entry), false)
+    end,
+})
+
 local function join(player)
     if closing or player.Parent ~= Players or entries[player] or loading[player] then
         return
@@ -522,6 +551,7 @@ local function join(player)
         player:SetAttribute(attribute, entry[field])
     end
     entries[player] = entry
+    bases.join(player, entry, record)
     if playtest then
         playtest:join(player, workspace:GetServerTimeNow(), record.onboarding == 0)
     end
@@ -542,6 +572,7 @@ local function join(player)
         end
         stopWeekly(player, entry)
         clearEgg(player, entry, "respawn")
+        bases.dropStolen(player, entry, nil)
         publish(player, entry)
         cosmeticShop.apply(player, entry)
         if entry.pet then
@@ -556,6 +587,7 @@ local function join(player)
                 publish(player, entry, "")
                 runFeedback:FireClient(player, "WeeklyStopped")
             end
+            bases.dropStolen(player, entry, "Ты уронил украденного питомца.")
             local lost = entry.egg ~= nil
             clearEgg(player, entry, "fall")
             if lost then
@@ -805,6 +837,13 @@ local function hatch(player, entry, root, secondsLeft, now, week)
     if isNew then
         player:SetAttribute("OwnsPet_" .. pet.id, true)
     end
+    if not bases.addPet(player, entry, pet) then
+        task.delay(4, function()
+            if entries[player] == entry then
+                publish(player, entry, "База заполнена: питомец только в коллекции. Купи слот на базе.")
+            end
+        end)
+    end
     if not entry.pet or unlockedTrail then
         entry.pet = entry.pet or pet
         showPet(root, entry.pet, entry.stormTrailUnlocked)
@@ -941,6 +980,10 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
     if root.Anchored then
         return
     end
+    if entry.stolen then
+        publish(player, entry, "Руки заняты: сначала донеси груз.")
+        return
+    end
     if entry.egg then
         publish(player, entry, "Сначала доставь яйцо в инкубатор.")
         return
@@ -979,6 +1022,10 @@ withNearbyPlayer(map.weekly.prompt, function(player, entry, root)
 end)
 
 local function pickUp(player, entry, root, vaultIndex, definition)
+    if entry.stolen then
+        publish(player, entry, "Руки заняты: сначала донеси груз.")
+        return
+    end
     local open, _, now = syncRound()
     if not Rules.canCollect(entry.egg ~= nil, open, entry.delivered) then
         return
